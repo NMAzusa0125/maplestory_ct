@@ -481,7 +481,7 @@
 
             <div class="form-tabs">
                 <button class="tab-button active" onclick="switchTab('consignment')">📤 代售委託</button>
-                <button class="tab-button" onclick="switchTab('purchase')">� 代收委託</button>
+                <button class="tab-button" onclick="switchTab('purchase')">📥 代收委託</button>
             </div>
 
             <!-- 代售表單 -->
@@ -956,12 +956,12 @@
                 }
 
                 // 嚴格檢查所有必要元素是否存在
-                if (!itemNameEl) { console.error(`錯誤: 找不到 ${tradeType}-itemName 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); return; }
-                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${tradeType}-itemType 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); return; }
-                if (!quantityEl) { console.error(`錯誤: 找不到 ${tradeType}-quantity 元素`); showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); return; }
-                if (!notesEl) { console.error(`錯誤: 找不到 ${tradeType}-notes 元素`); showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); return; }
-                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${tradeType}-seller 元素`); showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); return; }
-                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${tradeType}-buyer 元素`); showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); return; }
+                if (!itemNameEl) { console.error(`錯誤: 找不到 ${tradeType}-itemName 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${tradeType}-itemType 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!quantityEl) { console.error(`錯誤: 找不到 ${tradeType}-quantity 元素`); showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!notesEl) { console.error(`錯誤: 找不到 ${tradeType}-notes 元素`); showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${tradeType}-seller 元素`); showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${tradeType}-buyer 元素`); showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
 
 
                 const trade = {
@@ -983,21 +983,25 @@
                 if (!trade.itemName) { // 已經 trim() 過，所以不需要 .trim()
                     console.warn('驗證失敗: 道具名稱為空'); // 新增日誌
                     showMessage('請輸入道具名稱', 'error');
+                    restoreSubmitButton(); // Add restore
                     return;
                 }
                 if (!trade.itemType) { // 已經 trim() 過
                     console.warn('驗證失敗: 道具類型為空'); // 新增日誌
                     showMessage('請選擇道具類型', 'error');
+                    restoreSubmitButton(); // Add restore
                     return;
                 }
                 if (isConsignment && !trade.seller) { // 已經 trim() 過
                     console.warn('驗證失敗: 代售委託人(賣家)為空'); // 新增日誌
                     showMessage('代售委託請選擇委託人（賣家）', 'error');
+                    restoreSubmitButton(); // Add restore
                     return;
                 }
                 if (!isConsignment && !trade.buyer) { // 已經 trim() 過
                     console.warn('驗證失敗: 代收委託人(買家)為空'); // 新增日誌
                     showMessage('代收委託請選擇委託人（買家）', 'error');
+                    restoreSubmitButton(); // Add restore
                     return;
                 }
 
@@ -1019,7 +1023,8 @@
                 showMessage(`提交失敗: ${error.message}`, 'error');
             } finally {
                 // 無論成功或失敗，最後都要恢復按鈕狀態
-                restoreSubmitButton();
+                // This is a safety net. Individual 'return' paths should also call restore.
+                // restoreSubmitButton(); // Removed from here, moved to individual return paths
             }
         }
 
