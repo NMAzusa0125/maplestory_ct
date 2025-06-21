@@ -481,7 +481,7 @@
 
             <div class="form-tabs">
                 <button class="tab-button active" onclick="switchTab('consignment')">📤 代售委託</button>
-                <button class="tab-button" onclick="switchTab('purchase')">📥 代收委託</button>
+                <button class="tab-button" onclick="switchTab('purchase')">� 代收委託</button>
             </div>
 
             <!-- 代售表單 -->
@@ -928,6 +928,7 @@
 
             // 啟用提交按鈕的最後步驟，確保它總會被執行
             const restoreSubmitButton = () => {
+                console.log('恢復提交按鈕狀態'); // 新增日誌
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
@@ -955,48 +956,52 @@
                 }
 
                 // 嚴格檢查所有必要元素是否存在
-                if (!itemNameEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); return; }
-                if (!itemTypeEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); return; }
-                if (!quantityEl) { showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); return; }
-                if (!notesEl) { showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); return; }
-                if (isConsignment && !sellerEl) { showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); return; }
-                if (!isConsignment && !buyerEl) { showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); return; }
+                if (!itemNameEl) { console.error(`錯誤: 找不到 ${tradeType}-itemName 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); return; }
+                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${tradeType}-itemType 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); return; }
+                if (!quantityEl) { console.error(`錯誤: 找不到 ${tradeType}-quantity 元素`); showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); return; }
+                if (!notesEl) { console.error(`錯誤: 找不到 ${tradeType}-notes 元素`); showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); return; }
+                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${tradeType}-seller 元素`); showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); return; }
+                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${tradeType}-buyer 元素`); showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); return; }
 
 
                 const trade = {
                     tradeType: tradeType,
-                    itemName: itemNameEl.value,
-                    itemType: itemTypeEl.value,
-                    seller: isConsignment && sellerEl ? sellerEl.value : '',
-                    buyer: !isConsignment && buyerEl ? buyerEl.value : '',
+                    itemName: itemNameEl.value.trim(), // 新增 .trim() 確保沒有多餘空白
+                    itemType: itemTypeEl.value.trim(),   // 新增 .trim()
+                    seller: isConsignment && sellerEl ? sellerEl.value.trim() : '', // 新增 .trim()
+                    buyer: !isConsignment && buyerEl ? buyerEl.value.trim() : '',     // 新增 .trim()
                     quantity: parseInt(quantityEl.value) || 1,
-                    notes: notesEl.value || '',
+                    notes: notesEl.value.trim() || '',   // 新增 .trim()
                     timestamp: new Date().toISOString(),
                     status: 'pending' // 預設為待處理
                 };
 
-                console.log(`提交${isConsignment ? '代售' : '代收'}委託:`, trade);
+                console.log(`準備提交的 ${isConsignment ? '代售' : '代收'}委託資料:`, trade); // 顯示完整的 trade 物件
 
-                // *** 修正：檢查下拉選單的選中值是否為空字串，而不是僅檢查元素是否存在 ***
+                // 檢查下拉選單的選中值是否為空字串，而不是僅檢查元素是否存在
                 // 預設的 <option value="">請選擇</option> 會導致 !trade.itemType 或 !trade.seller/buyer 為 true
-                if (!trade.itemName.trim()) {
+                if (!trade.itemName) { // 已經 trim() 過，所以不需要 .trim()
+                    console.warn('驗證失敗: 道具名稱為空'); // 新增日誌
                     showMessage('請輸入道具名稱', 'error');
                     return;
                 }
-                if (!trade.itemType.trim()) {
+                if (!trade.itemType) { // 已經 trim() 過
+                    console.warn('驗證失敗: 道具類型為空'); // 新增日誌
                     showMessage('請選擇道具類型', 'error');
                     return;
                 }
-                if (isConsignment && !trade.seller.trim()) {
+                if (isConsignment && !trade.seller) { // 已經 trim() 過
+                    console.warn('驗證失敗: 代售委託人(賣家)為空'); // 新增日誌
                     showMessage('代售委託請選擇委託人（賣家）', 'error');
                     return;
                 }
-                if (!isConsignment && !trade.buyer.trim()) {
+                if (!isConsignment && !trade.buyer) { // 已經 trim() 過
+                    console.warn('驗證失敗: 代收委託人(買家)為空'); // 新增日誌
                     showMessage('代收委託請選擇委託人（買家）', 'error');
                     return;
                 }
 
-
+                console.log('所有驗證通過，嘗試儲存交易...'); // 新增日誌
                 const success = await saveTrade(trade); // 呼叫 API 儲存資料
                 if (success) {
                     form.reset(); // 清空表單
@@ -1005,6 +1010,7 @@
                 } else {
                     // saveTrade 失敗時，showMessage 會在 saveTrade 內部呼叫
                     // 這裡不需要額外的 showMessage
+                    console.error('saveTrade 函式返回失敗'); // 新增日誌
                 }
 
             } catch (error) {
