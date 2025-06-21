@@ -619,7 +619,9 @@
     </div>
 
 <script>
-        // 全域變數
+    (function() { // 將整個腳本包裹在 IIFE 中
+
+        // 全域變數 (現在是 IIFE 的局部變數)
         let trades = [];
         let apiUrl = localStorage.getItem('consignmentApiUrl') || '';
         let currentLogFilter = 'all';
@@ -955,6 +957,18 @@
                     buyerEl = document.getElementById(`${tradeType}-buyer`);
                 }
 
+                // *** 新增日誌：打印出查找的 ID 和結果 ***
+                console.log(`查找元素 ID: ${tradeType}-itemName, 結果:`, itemNameEl);
+                console.log(`查找元素 ID: ${tradeType}-itemType, 結果:`, itemTypeEl);
+                console.log(`查找元素 ID: ${tradeType}-quantity, 結果:`, quantityEl);
+                console.log(`查找元素 ID: ${tradeType}-notes, 結果:`, notesEl);
+                if (isConsignment) {
+                    console.log(`查找元素 ID: ${tradeType}-seller, 結果:`, sellerEl);
+                } else {
+                    console.log(`查找元素 ID: ${tradeType}-buyer, 結果:`, buyerEl);
+                }
+
+
                 // 嚴格檢查所有必要元素是否存在
                 if (!itemNameEl) { console.error(`錯誤: 找不到 ${tradeType}-itemName 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
                 if (!itemTypeEl) { console.error(`錯誤: 找不到 ${tradeType}-itemType 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
@@ -1047,6 +1061,8 @@
         });
 
         console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v6.1 穩定修正版');
-    </script>
+
+    })(); // IIFE 結束
+</script>
 </body>
 </html>
