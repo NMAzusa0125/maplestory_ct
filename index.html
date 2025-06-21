@@ -449,7 +449,7 @@
                 <div class="sync-indicator" id="syncIndicator"></div>
                 <span id="syncStatus">離線模式</span>
             </div>
-            <h1>🍁 楓之谷 Artale 楓葉萬事屋</h1>
+            <h1>� 楓之谷 Artale 楓葉萬事屋</h1>
             <p>協助處理代售與代收道具交易</p>
         </div>
 
@@ -938,30 +938,30 @@
                 submitBtn.disabled = true; // 禁用按鈕
                 submitBtn.textContent = '提交中...'; // 更新按鈕文字
 
-                // *** 修正：更安全的元素獲取方式，確保元素存在 ***
-                // 由於 tab-content 的 display: none; 可能導致某些瀏覽器在非 active tab 時返回 null
-                // 因此直接使用 form.querySelector 在當前 active 的表單中尋找元素更為穩健
-                const getItemById = (id) => {
-                    const el = form.querySelector(`#${id}`);
-                    if (!el) {
-                        throw new Error(`找不到 ID 為 "${id}" 的元素。請檢查 HTML 結構或 Tab 切換邏輯。`);
-                    }
-                    return el;
-                };
-
-                const itemNameEl = getItemById(`${tradeType}-itemName`);
-                const itemTypeEl = getItemById(`${tradeType}-itemType`);
-                const quantityEl = getItemById(`${tradeType}-quantity`);
-                const notesEl = getItemById(`${tradeType}-notes`);
+                // *** 修正：直接從 document 獲取元素，並明確檢查其存在性 ***
+                // 這樣可以避免 form.querySelector 在 display: none; 的 tab 內容中可能出現的問題
+                const itemNameEl = document.getElementById(`${tradeType}-itemName`);
+                const itemTypeEl = document.getElementById(`${tradeType}-itemType`);
+                const quantityEl = document.getElementById(`${tradeType}-quantity`);
+                const notesEl = document.getElementById(`${tradeType}-notes`);
 
                 let sellerEl = null;
                 let buyerEl = null;
 
                 if (isConsignment) {
-                    sellerEl = getItemById(`${tradeType}-seller`);
+                    sellerEl = document.getElementById(`${tradeType}-seller`);
                 } else {
-                    buyerEl = getItemById(`${tradeType}-buyer`);
+                    buyerEl = document.getElementById(`${tradeType}-buyer`);
                 }
+
+                // 嚴格檢查所有必要元素是否存在
+                if (!itemNameEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); return; }
+                if (!itemTypeEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); return; }
+                if (!quantityEl) { showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); return; }
+                if (!notesEl) { showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); return; }
+                if (isConsignment && !sellerEl) { showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); return; }
+                if (!isConsignment && !buyerEl) { showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); return; }
+
 
                 const trade = {
                     tradeType: tradeType,
@@ -977,7 +977,7 @@
 
                 console.log(`提交${isConsignment ? '代售' : '代收'}委託:`, trade);
 
-                // 再次確認必要欄位是否填寫
+                // 再次確認必要欄位是否填寫（值是否為空）
                 if (!trade.itemName || !trade.itemType || (isConsignment ? !trade.seller : !trade.buyer)) {
                     showMessage('請填寫所有必要欄位', 'error');
                     return; // 直接返回，按鈕恢復邏輯會在 finally 執行
@@ -995,6 +995,7 @@
 
             } catch (error) {
                 console.error('處理表單提交時發生錯誤:', error);
+                // 顯示內部錯誤訊息，幫助診斷
                 showMessage(`提交失敗: ${error.message}`, 'error');
             } finally {
                 // 無論成功或失敗，最後都要恢復按鈕狀態
