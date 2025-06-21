@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>楓之谷 Artale 代售代收系統</title>
+    <title>楓之谷 Artale 楓葉萬事屋</title>
     <style>
         * {
             margin: 0;
@@ -448,7 +448,7 @@
                 <div class="sync-indicator" id="syncIndicator"></div>
                 <span id="syncStatus">離線模式</span>
             </div>
-            <h1>🍁 楓之谷 Artale 代售代收系統</h1>
+            <h1>🍁 楓之谷 Artale 楓葉萬事屋</h1>
             <p>協助處理代售與代收道具交易</p>
         </div>
 
@@ -599,8 +599,8 @@
 
             <div class="trade-log">
                 <h2>
-                    📋 交易記錄 
-                    <button class="refresh-btn" onclick="loadTrades()">🔄 重新整理</button>
+                    📋記錄 
+                    <button class="refresh-btn" onclick="loadTrades()">🔄重整</button>
                 </h2>
                 
                 <div class="log-tabs">
@@ -875,7 +875,7 @@
             logContainer.innerHTML = tradesHtml;
         }
 
-        // 代售表單提交
+        // 代售表單提交 - 修正版
         document.getElementById('consignmentForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -890,13 +890,7 @@
                 seller: document.getElementById('consign-seller').value,
                 buyer: '', // 代售時買家為空
                 quantity: parseInt(document.getElementById('consign-quantity').value) || 1,
-                amount: 0, // 前端不填金額
-                currency: '', // 前端不填貨幣
-                fee: 0,
-                netAmount: 0,
-                feeRate: document.getElementById('consign-itemType').value === 'equipment' ? 0.2 : 0.1,
                 notes: document.getElementById('consign-notes').value,
-                status: 'pending',
                 timestamp: new Date().toISOString()
             };
 
@@ -912,7 +906,7 @@
             submitBtn.textContent = '📤 提交代售委託';
         });
 
-        // 代收表單提交
+        // 代收表單提交 - 修正版
         document.getElementById('purchaseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
@@ -927,13 +921,7 @@
                 seller: '', // 代收時賣家為空
                 buyer: document.getElementById('purchase-buyer').value,
                 quantity: parseInt(document.getElementById('purchase-quantity').value) || 1,
-                amount: 0, // 前端不填金額
-                currency: '', // 前端不填貨幣
-                fee: 0,
-                netAmount: 0,
-                feeRate: document.getElementById('purchase-itemType').value === 'equipment' ? 0.2 : 0.1,
                 notes: document.getElementById('purchase-notes').value,
-                status: 'pending',
                 timestamp: new Date().toISOString()
             };
 
