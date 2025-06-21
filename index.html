@@ -600,7 +600,7 @@
 
             <div class="trade-log">
                 <h2>
-                    �記錄 
+                    📋記錄 
                     <button class="refresh-btn" onclick="loadTrades()">🔄重整</button>
                 </h2>
                 
@@ -723,7 +723,8 @@
         // 切換標籤
         function switchTab(tabName) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // 使用 event.currentTarget 而不是 event.target，確保在事件委託時能正確獲取到綁定事件的元素
+            event.currentTarget.classList.add('active');
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName + '-tab').classList.add('active');
         }
@@ -732,7 +733,8 @@
         function switchLogTab(filter) {
             currentLogFilter = filter;
             document.querySelectorAll('.log-tab').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // 使用 event.currentTarget 而不是 event.target
+            event.currentTarget.classList.add('active');
             displayTrades();
         }
 
@@ -803,6 +805,7 @@
             if (!messageDiv) return;
             messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
             messageDiv.innerHTML = message.replace(/\n/g, '<br>');
+            // 延遲清除訊息，讓使用者有時間閱讀
             setTimeout(() => {
                 messageDiv.textContent = '';
                 messageDiv.className = '';
@@ -915,62 +918,88 @@
 
         // 通用表單提交處理函數
         async function handleFormSubmit(event, tradeType) {
-            event.preventDefault();
+            event.preventDefault(); // 防止表單預設提交行為
+
             const isConsignment = tradeType === 'consignment';
             const form = event.target;
-            const submitBtn = form.querySelector('button[type="submit"]');
+            const submitBtn = form.querySelector('button[type="submit"]'); // 獲取當前提交表單內的按鈕
             
             const originalText = submitBtn.textContent;
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
 
-            // *** 修正：加入元素存在性檢查 ***
-            const itemNameEl = document.getElementById(`${tradeType}-itemName`);
-            const itemTypeEl = document.getElementById(`${tradeType}-itemType`);
-            const sellerEl = document.getElementById(`${tradeType}-seller`);
-            const buyerEl = document.getElementById(`${tradeType}-buyer`);
-            const quantityEl = document.getElementById(`${tradeType}-quantity`);
-            const notesEl = document.getElementById(`${tradeType}-notes`);
-
-            if (!itemNameEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-            if (!itemTypeEl) { showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-            if (isConsignment && !sellerEl) { showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-            if (!isConsignment && !buyerEl) { showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-            if (!quantityEl) { showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-            if (!notesEl) { showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); submitBtn.disabled = false; submitBtn.textContent = originalText; return; }
-
-
-            const trade = {
-                tradeType: tradeType,
-                itemName: itemNameEl.value,
-                itemType: itemTypeEl.value,
-                seller: isConsignment ? sellerEl.value : '',
-                buyer: isConsignment ? '' : buyerEl.value,
-                quantity: parseInt(quantityEl.value) || 1,
-                notes: notesEl.value || '',
-                timestamp: new Date().toISOString(),
-                status: 'pending' // 預設為待處理
+            // 啟用提交按鈕的最後步驟，確保它總會被執行
+            const restoreSubmitButton = () => {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
             };
 
-            console.log(`提交${isConsignment ? '代售' : '代收'}委託:`, trade);
+            try {
+                submitBtn.disabled = true; // 禁用按鈕
+                submitBtn.textContent = '提交中...'; // 更新按鈕文字
 
-            // 再次確認必要欄位是否填寫
-            if (!trade.itemName || !trade.itemType || (isConsignment ? !trade.seller : !trade.buyer)) {
-                showMessage('請填寫所有必要欄位', 'error');
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-                return;
+                // *** 修正：更安全的元素獲取方式，確保元素存在 ***
+                // 由於 tab-content 的 display: none; 可能導致某些瀏覽器在非 active tab 時返回 null
+                // 因此直接使用 form.querySelector 在當前 active 的表單中尋找元素更為穩健
+                const getItemById = (id) => {
+                    const el = form.querySelector(`#${id}`);
+                    if (!el) {
+                        throw new Error(`找不到 ID 為 "${id}" 的元素。請檢查 HTML 結構或 Tab 切換邏輯。`);
+                    }
+                    return el;
+                };
+
+                const itemNameEl = getItemById(`${tradeType}-itemName`);
+                const itemTypeEl = getItemById(`${tradeType}-itemType`);
+                const quantityEl = getItemById(`${tradeType}-quantity`);
+                const notesEl = getItemById(`${tradeType}-notes`);
+
+                let sellerEl = null;
+                let buyerEl = null;
+
+                if (isConsignment) {
+                    sellerEl = getItemById(`${tradeType}-seller`);
+                } else {
+                    buyerEl = getItemById(`${tradeType}-buyer`);
+                }
+
+                const trade = {
+                    tradeType: tradeType,
+                    itemName: itemNameEl.value,
+                    itemType: itemTypeEl.value,
+                    seller: isConsignment && sellerEl ? sellerEl.value : '',
+                    buyer: !isConsignment && buyerEl ? buyerEl.value : '',
+                    quantity: parseInt(quantityEl.value) || 1,
+                    notes: notesEl.value || '',
+                    timestamp: new Date().toISOString(),
+                    status: 'pending' // 預設為待處理
+                };
+
+                console.log(`提交${isConsignment ? '代售' : '代收'}委託:`, trade);
+
+                // 再次確認必要欄位是否填寫
+                if (!trade.itemName || !trade.itemType || (isConsignment ? !trade.seller : !trade.buyer)) {
+                    showMessage('請填寫所有必要欄位', 'error');
+                    return; // 直接返回，按鈕恢復邏輯會在 finally 執行
+                }
+
+                const success = await saveTrade(trade); // 呼叫 API 儲存資料
+                if (success) {
+                    form.reset(); // 清空表單
+                    await loadTrades(); // 重新載入交易記錄
+                    showMessage(`${isConsignment ? '代售' : '代收'}委託已成功提交！`, 'success');
+                } else {
+                    // saveTrade 失敗時，showMessage 會在 saveTrade 內部呼叫
+                    // 這裡不需要額外的 showMessage
+                }
+
+            } catch (error) {
+                console.error('處理表單提交時發生錯誤:', error);
+                showMessage(`提交失敗: ${error.message}`, 'error');
+            } finally {
+                // 無論成功或失敗，最後都要恢復按鈕狀態
+                restoreSubmitButton();
             }
-
-            const success = await saveTrade(trade);
-            if (success) {
-                form.reset();
-                await loadTrades();
-                showMessage(`${isConsignment ? '代售' : '代收'}委託已成功提交！`, 'success');
-            }
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
         }
 
         // 綁定表單事件
