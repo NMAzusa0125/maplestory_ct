@@ -458,8 +458,9 @@
                 <h3>⚙️ 雲端同步設定</h3>
                 <div class="config-input">
                     <input type="url" id="apiUrl" placeholder="請輸入 Google Apps Script API 網址" />
-                    <button onclick="saveApiConfig()">儲存設定</button>
-                    <button onclick="testConnection()">測試連線</button>
+                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
+                    <button id="saveApiConfigBtn">儲存設定</button>
+                    <button id="testConnectionBtn">測試連線</button>
                 </div>
                 <div id="configMessage"></div>
             </div>
@@ -480,8 +481,9 @@
             </div>
 
             <div class="form-tabs">
-                <button class="tab-button active" onclick="switchTab('consignment')">📤 代售委託</button>
-                <button class="tab-button" onclick="switchTab('purchase')">📥 代收委託</button>
+                <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
+                <button class="tab-button active" id="consignmentTabBtn">📤 代售委託</button>
+                <button class="tab-button" id="purchaseTabBtn">📥 代收委託</button>
             </div>
 
             <!-- 代售表單 -->
@@ -601,14 +603,16 @@
             <div class="trade-log">
                 <h2>
                     📋記錄 
-                    <button class="refresh-btn" onclick="loadTrades()">�重整</button>
+                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
+                    <button class="refresh-btn" id="refreshTradesBtn">🔄重整</button>
                 </h2>
                 
                 <div class="log-tabs">
-                    <button class="log-tab active" onclick="switchLogTab('all')">全部</button>
-                    <button class="log-tab" onclick="switchLogTab('consignment')">代售</button>
-                    <button class="log-tab" onclick="switchLogTab('purchase')">代收</button>
-                    <button class="log-tab" onclick="switchLogTab('pending')">待處理</button>
+                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
+                    <button class="log-tab active" id="logTabAll">全部</button>
+                    <button class="log-tab" id="logTabConsignment">代售</button>
+                    <button class="log-tab" id="logTabPurchase">代收</button>
+                    <button class="log-tab" id="logTabPending">待處理</button>
                 </div>
 
                 <div id="tradeLog">
@@ -629,6 +633,24 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('系統初始化...');
+            
+            // 綁定事件監聽器 - 新增的部分
+            // 配置區塊按鈕
+            document.getElementById('saveApiConfigBtn')?.addEventListener('click', saveApiConfig);
+            document.getElementById('testConnectionBtn')?.addEventListener('click', testConnection);
+
+            // 表單切換按鈕
+            document.getElementById('consignmentTabBtn')?.addEventListener('click', () => switchTab('consignment'));
+            document.getElementById('purchaseTabBtn')?.addEventListener('click', () => switchTab('purchase'));
+
+            // 記錄篩選按鈕
+            document.getElementById('refreshTradesBtn')?.addEventListener('click', loadTrades);
+            document.getElementById('logTabAll')?.addEventListener('click', () => switchLogTab('all'));
+            document.getElementById('logTabConsignment')?.addEventListener('click', () => switchLogTab('consignment'));
+            document.getElementById('logTabPurchase')?.addEventListener('click', () => switchLogTab('purchase'));
+            document.getElementById('logTabPending')?.addEventListener('click', () => switchLogTab('pending'));
+
+
             if (apiUrl) {
                 document.getElementById('apiUrl').value = apiUrl;
                 updateSyncStatus('offline');
@@ -725,8 +747,9 @@
         // 切換標籤
         function switchTab(tabName) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            // 使用 event.currentTarget 而不是 event.target，確保在事件委託時能正確獲取到綁定事件的元素
-            event.currentTarget.classList.add('active');
+            // 找到對應的按鈕並添加 active class
+            document.getElementById(tabName + 'TabBtn').classList.add('active'); // 使用 ID 查找按鈕
+            
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName + '-tab').classList.add('active');
         }
@@ -735,8 +758,9 @@
         function switchLogTab(filter) {
             currentLogFilter = filter;
             document.querySelectorAll('.log-tab').forEach(btn => btn.classList.remove('active'));
-            // 使用 event.currentTarget 而不是 event.target
-            event.currentTarget.classList.add('active');
+            // 找到對應的按鈕並添加 active class
+            document.getElementById('logTab' + filter.charAt(0).toUpperCase() + filter.slice(1))?.classList.add('active'); // 處理 'all', 'consignment' 等
+            
             displayTrades();
         }
 
