@@ -618,24 +618,33 @@
     </div>
 
     <script>
+        // 全域變數
         let trades = [];
         let apiUrl = localStorage.getItem('consignmentApiUrl') || '';
         let currentLogFilter = 'all';
 
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('系統初始化...');
             if (apiUrl) {
                 document.getElementById('apiUrl').value = apiUrl;
-                loadTrades();
+                updateSyncStatus('offline');
+                // 延遲載入以確保頁面完全載入
+                setTimeout(() => {
+                    testConnection();
+                }, 1000);
+            } else {
+                updateSyncStatus('offline');
+                showMessage('請先設定 Google Apps Script API 網址', 'error');
             }
-            updateSyncStatus('offline');
         });
 
-        // JSONP 請求函數 - 修正版
+        // JSONP 請求函數 - 優化版
         function makeApiRequestJsonp(action, data = null) {
             return new Promise((resolve, reject) => {
                 const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                let script; // 先聲明 script 變數
+                let script;
+                let timeoutId;
                 
                 // 建立 URL
                 let url = `${apiUrl}?action=${encodeURIComponent(action)}&callback=${callbackName}`;
@@ -643,15 +652,18 @@
                     url += `&data=${encodeURIComponent(JSON.stringify(data))}`;
                 }
                 
-                console.log('JSONP 請求 URL:', url);
+                console.log('JSONP 請求:', { action, url: url.substring(0, 100) + '...' });
                 
                 // 清理函數
                 function cleanup() {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
                     if (window[callbackName]) {
                         delete window[callbackName];
                     }
-                    if (script && document.head.contains(script)) {
-                        document.head.removeChild(script);
+                    if (script && script.parentNode) {
+                        script.parentNode.removeChild(script);
                     }
                 }
                 
@@ -675,113 +687,34 @@
                     reject(new Error('網路請求失敗'));
                 };
                 
-                document.head.appendChild(script);
-                
-                // 15秒超時
-                setTimeout(() => {
-                    if (window[callbackName]) {
-                        cleanup();
-                        reject(new Error('請求超時'));
-                    }
+                // 設定超時
+                timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('請求超時'));
                 }, 15000);
+                
+                document.head.appendChild(script);
             });
         }
 
-        // 統一的 API 請求函數 - 優先使用 JSONP
+        // 統一的 API 請求函數
         async function makeApiRequest(method, action, data = null) {
             if (!apiUrl) {
                 throw new Error('請先設定 API 網址');
             }
 
-            const maxRetries = 2;
-            let lastError;
-
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    console.log(`API 請求 (嘗試 ${attempt}/${maxRetries}):`, { method, action, data });
-                    
-                    // 優先使用 JSONP
-                    try {
-                        const result = await makeApiRequestJsonp(action, data);
-                        console.log('JSONP 請求成功:', result);
-                        return result;
-                    } catch (jsonpError) {
-                        console.log('JSONP 請求失敗:', jsonpError);
-                        
-                        // 如果是最後一次嘗試，拋出錯誤
-                        if (attempt === maxRetries) {
-                            throw jsonpError;
-                        }
-                    }
-                    
-                    // 備用方案：標準 fetch
-                    if (attempt === 1) {
-                        let response;
-                        
-                        try {
-                            if (method === 'GET') {
-                                let url = `${apiUrl}?action=${encodeURIComponent(action)}`;
-                                if (data) {
-                                    url += `&data=${encodeURIComponent(JSON.stringify(data))}`;
-                                }
-                                
-                                response = await fetch(url, {
-                                    method: 'GET',
-                                    mode: 'cors',
-                                    credentials: 'omit',
-                                    headers: {
-                                        'Accept': 'application/json',
-                                    }
-                                });
-                            } else {
-                                response = await fetch(apiUrl, {
-                                    method: 'POST',
-                                    mode: 'cors',
-                                    credentials: 'omit',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Accept': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                        action: action,
-                                        data: data
-                                    })
-                                });
-                            }
-
-                            if (!response.ok) {
-                                throw new Error(`HTTP error! status: ${response.status}`);
-                            }
-
-                            const result = await response.json();
-                            console.log('Fetch 請求成功:', result);
-
-                            if (!result.success) {
-                                throw new Error(result.error || '請求失敗');
-                            }
-
-                            return result;
-                        } catch (fetchError) {
-                            console.log('Fetch 請求也失敗:', fetchError);
-                            throw fetchError;
-                        }
-                    }
-                    
-                } catch (error) {
-                    lastError = error;
-                    console.error(`API 請求失敗 (嘗試 ${attempt}/${maxRetries}):`, error);
-                    
-                    // 如果是最後一次嘗試，直接拋出
-                    if (attempt === maxRetries) {
-                        throw error;
-                    }
-                    
-                    // 等待後重試
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
+            try {
+                console.log(`API 請求:`, { method, action, data });
+                
+                // 使用 JSONP
+                const result = await makeApiRequestJsonp(action, data);
+                console.log('API 回應成功:', result);
+                return result;
+                
+            } catch (error) {
+                console.error('API 請求失敗:', error);
+                throw error;
             }
-            
-            throw lastError;
         }
 
         // 切換標籤
@@ -820,7 +753,11 @@
             localStorage.setItem('consignmentApiUrl', url);
             apiUrl = url;
             showMessage('API 設定已儲存', 'success');
-            testConnection(); // 自動測試連線
+            
+            // 自動測試連線
+            setTimeout(() => {
+                testConnection();
+            }, 500);
         }
 
         // 測試連線
@@ -836,7 +773,7 @@
                 console.log('開始測試連線...');
                 const result = await makeApiRequest('GET', 'test');
                 
-                showMessage(`連線測試成功！伺服器版本: ${result.version || 'v5.0'}`, 'success');
+                showMessage(`連線測試成功！伺服器版本: ${result.version || 'v6.0'}`, 'success');
                 updateSyncStatus('online');
                 console.log('連線測試結果:', result);
                 
@@ -848,24 +785,13 @@
             } catch (error) {
                 console.error('連線測試失敗:', error);
                 
-                // 提供詳細的錯誤診斷和解決方案
                 let errorMessage = `連線測試失敗: ${error.message}\n\n`;
-                
-                if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
-                    errorMessage += '🔧 CORS 問題解決方案:\n';
-                    errorMessage += '1. 請重新部署 Google Apps Script\n';
-                    errorMessage += '2. 確保部署設定為"任何人"可存取\n';
-                    errorMessage += '3. 在瀏覽器新頁面開啟此網址測試:\n';
-                    errorMessage += `${apiUrl}?action=test`;
-                } else if (error.message.includes('404')) {
-                    errorMessage += '❌ 請檢查 API 網址是否正確';
-                } else if (error.message.includes('403')) {
-                    errorMessage += '❌ 請檢查 Apps Script 的權限設定';
-                } else if (error.message.includes('超時') || error.message.includes('timeout')) {
-                    errorMessage += '⏰ 請求超時，請檢查網路連線或稍後再試';
-                } else if (error.message.includes('網路請求失敗')) {
-                    errorMessage += '🌐 網路連線問題，請檢查網路設定';
-                }
+                errorMessage += '🔧 請檢查:\n';
+                errorMessage += '1. API 網址是否正確\n';
+                errorMessage += '2. Google Apps Script 是否已部署\n';
+                errorMessage += '3. 部署設定是否為"任何人"可存取\n';
+                errorMessage += '4. 試著在新分頁開啟此網址測試:\n';
+                errorMessage += `${apiUrl}?action=test`;
                 
                 showMessage(errorMessage, 'error');
                 updateSyncStatus('error');
@@ -877,7 +803,7 @@
             const indicator = document.getElementById('syncIndicator');
             const statusText = document.getElementById('syncStatus');
             
-            if (!indicator || !statusText) return; // 防止元素不存在的錯誤
+            if (!indicator || !statusText) return;
             
             // 重置所有 class
             indicator.className = 'sync-indicator';
@@ -906,15 +832,16 @@
         // 顯示訊息
         function showMessage(message, type) {
             const messageDiv = document.getElementById('configMessage');
-            if (!messageDiv) return; // 防止元素不存在的錯誤
+            if (!messageDiv) return;
             
             messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
             messageDiv.innerHTML = message.replace(/\n/g, '<br>');
             
+            // 較長時間顯示錯誤訊息
             setTimeout(() => {
                 messageDiv.textContent = '';
                 messageDiv.className = '';
-            }, 8000);
+            }, type === 'error' ? 10000 : 5000);
         }
 
         // 載入交易記錄
@@ -970,7 +897,6 @@
             updateSyncStatus('syncing');
             
             try {
-                // 使用 GET 方式傳遞數據（通過 JSONP）
                 const result = await makeApiRequest('GET', 'addTrade', tradeData);
                 
                 console.log('交易儲存成功:', result);
@@ -990,7 +916,6 @@
             const purchaseTrades = trades.filter(trade => trade.tradeType === 'purchase');
             const pendingTrades = trades.filter(trade => trade.status === 'pending');
 
-            // 安全地更新統計數據
             const totalConsignment = document.getElementById('totalConsignment');
             const totalPurchase = document.getElementById('totalPurchase');
             const pendingTradesEl = document.getElementById('pendingTrades');
@@ -1027,7 +952,7 @@
                 return;
             }
 
-            const tradesHtml = filteredTrades.map((trade, index) => {
+            const tradesHtml = filteredTrades.map((trade) => {
                 // 設定道具類型顯示文字
                 let typeText;
                 switch(trade.itemType) {
@@ -1050,21 +975,21 @@
                 try {
                     date = new Date(trade.timestamp).toLocaleString('zh-TW');
                 } catch (e) {
-                    date = '無效時間';
+                    date = trade.timestamp || '無效時間';
                 }
                 
                 const statusText = trade.status === 'pending' ? '待處理' : '已完成';
-                const clientName = trade.tradeType === 'consignment' ? trade.seller : trade.buyer;
+                const clientName = trade.client || (trade.tradeType === 'consignment' ? trade.seller : trade.buyer) || '未知';
 
                 return `
                     <div class="trade-item ${itemClass}">
                         <div class="trade-item-header">
-                            <div class="trade-item-title">${trade.itemName || '未知道具'} ${trade.quantity ? `x${trade.quantity}` : ''}</div>
+                            <div class="trade-item-title">${trade.itemName || '未知道具'} ${trade.quantity > 1 ? `x${trade.quantity}` : ''}</div>
                             <div class="trade-item-type ${tradeTypeClass}">${tradeTypeText} - ${typeText}</div>
                         </div>
                         <div class="trade-item-details">
-                            <div><strong>委託人:</strong> ${clientName || '未知'}</div>
-                            ${trade.quantity ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
+                            <div><strong>委託人:</strong> ${clientName}</div>
+                            ${trade.quantity > 1 ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
                             <div><strong>狀態:</strong> ${statusText}</div>
                             <div><strong>時間:</strong> ${date}</div>
                             ${trade.notes ? `<div><strong>備註:</strong> ${trade.notes}</div>` : ''}
@@ -1213,7 +1138,7 @@
             }
         });
 
-        console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v5.0 修正版');
+        console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v6.0 完整修正版');
     </script>
 </body>
 </html>
