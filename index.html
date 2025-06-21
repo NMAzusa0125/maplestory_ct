@@ -621,7 +621,7 @@
         let trades = [];
         let apiUrl = localStorage.getItem('consignmentApiUrl') || '';
         let currentLogFilter = 'all';
-        
+
         // 初始化
         document.addEventListener('DOMContentLoaded', function() {
             if (apiUrl) {
@@ -630,6 +630,159 @@
             }
             updateSyncStatus('offline');
         });
+
+        // JSONP 請求函數 - 修正版
+        function makeApiRequestJsonp(action, data = null) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                let script; // 先聲明 script 變數
+                
+                // 建立 URL
+                let url = `${apiUrl}?action=${encodeURIComponent(action)}&callback=${callbackName}`;
+                if (data) {
+                    url += `&data=${encodeURIComponent(JSON.stringify(data))}`;
+                }
+                
+                console.log('JSONP 請求 URL:', url);
+                
+                // 清理函數
+                function cleanup() {
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                    }
+                    if (script && document.head.contains(script)) {
+                        document.head.removeChild(script);
+                    }
+                }
+                
+                // 建立回調函數
+                window[callbackName] = function(response) {
+                    cleanup();
+                    console.log('JSONP 回應:', response);
+                    
+                    if (response && response.success) {
+                        resolve(response);
+                    } else {
+                        reject(new Error(response?.error || '請求失敗'));
+                    }
+                };
+                
+                // 建立 script 標籤
+                script = document.createElement('script');
+                script.src = url;
+                script.onerror = function() {
+                    cleanup();
+                    reject(new Error('網路請求失敗'));
+                };
+                
+                document.head.appendChild(script);
+                
+                // 15秒超時
+                setTimeout(() => {
+                    if (window[callbackName]) {
+                        cleanup();
+                        reject(new Error('請求超時'));
+                    }
+                }, 15000);
+            });
+        }
+
+        // 統一的 API 請求函數 - 優先使用 JSONP
+        async function makeApiRequest(method, action, data = null) {
+            if (!apiUrl) {
+                throw new Error('請先設定 API 網址');
+            }
+
+            const maxRetries = 2;
+            let lastError;
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    console.log(`API 請求 (嘗試 ${attempt}/${maxRetries}):`, { method, action, data });
+                    
+                    // 優先使用 JSONP
+                    try {
+                        const result = await makeApiRequestJsonp(action, data);
+                        console.log('JSONP 請求成功:', result);
+                        return result;
+                    } catch (jsonpError) {
+                        console.log('JSONP 請求失敗:', jsonpError);
+                        
+                        // 如果是最後一次嘗試，拋出錯誤
+                        if (attempt === maxRetries) {
+                            throw jsonpError;
+                        }
+                    }
+                    
+                    // 備用方案：標準 fetch
+                    if (attempt === 1) {
+                        let response;
+                        
+                        try {
+                            if (method === 'GET') {
+                                let url = `${apiUrl}?action=${encodeURIComponent(action)}`;
+                                if (data) {
+                                    url += `&data=${encodeURIComponent(JSON.stringify(data))}`;
+                                }
+                                
+                                response = await fetch(url, {
+                                    method: 'GET',
+                                    mode: 'cors',
+                                    credentials: 'omit',
+                                    headers: {
+                                        'Accept': 'application/json',
+                                    }
+                                });
+                            } else {
+                                response = await fetch(apiUrl, {
+                                    method: 'POST',
+                                    mode: 'cors',
+                                    credentials: 'omit',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        action: action,
+                                        data: data
+                                    })
+                                });
+                            }
+
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+
+                            const result = await response.json();
+                            console.log('Fetch 請求成功:', result);
+
+                            if (!result.success) {
+                                throw new Error(result.error || '請求失敗');
+                            }
+
+                            return result;
+                        } catch (fetchError) {
+                            console.log('Fetch 請求也失敗:', fetchError);
+                            throw fetchError;
+                        }
+                    }
+                    
+                } catch (error) {
+                    lastError = error;
+                    console.error(`API 請求失敗 (嘗試 ${attempt}/${maxRetries}):`, error);
+                    
+                    // 如果是最後一次嘗試，直接拋出
+                    if (attempt === maxRetries) {
+                        throw error;
+                    }
+                    
+                    // 等待後重試
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                }
+            }
+            
+            throw lastError;
+        }
 
         // 切換標籤
         function switchTab(tabName) {
@@ -658,10 +811,16 @@
                 return;
             }
             
+            // 改進的 URL 格式驗證
+            if (!url.includes('script.google.com')) {
+                showMessage('請確認這是正確的 Google Apps Script 網址', 'error');
+                return;
+            }
+            
             localStorage.setItem('consignmentApiUrl', url);
             apiUrl = url;
             showMessage('API 設定已儲存', 'success');
-            loadTrades();
+            testConnection(); // 自動測試連線
         }
 
         // 測試連線
@@ -674,268 +833,35 @@
             updateSyncStatus('syncing');
             
             try {
-                const response = await fetch(`${apiUrl}?action=test`);
-                const result = await response.json();
+                console.log('開始測試連線...');
+                const result = await makeApiRequest('GET', 'test');
                 
-                if (result.success) {
-                    showMessage('連線測試成功！', 'success');
-                    updateSyncStatus('online');
-                } else {
-                    throw new Error(result.error || '連線失敗');
-                }
+                showMessage(`連線測試成功！伺服器版本: ${result.version || 'v5.0'}`, 'success');
+                updateSyncStatus('online');
+                console.log('連線測試結果:', result);
+                
+                // 測試成功後自動載入交易記錄
+                setTimeout(() => {
+                    loadTrades();
+                }, 1000);
+                
             } catch (error) {
                 console.error('連線測試失敗:', error);
-                showMessage(`連線測試失敗: ${error.message}`, 'error');
-                updateSyncStatus('error');
-            }
-        }
-
-        // 更新同步狀態
-        function updateSyncStatus(status) {
-            const indicator = document.getElementById('syncIndicator');
-            const statusText = document.getElementById('syncStatus');
-            
-            indicator.className = 'sync-indicator';
-            
-            switch(status) {
-                case 'online':
-                    statusText.textContent = '已連線';
-                    break;
-                case 'syncing':
-                    indicator.classList.add('syncing');
-                    statusText.textContent = '同步中...';
-                    break;
-                case 'error':
-                    indicator.classList.add('error');
-                    statusText.textContent = '連線錯誤';
-                    break;
-                default:
-                    statusText.textContent = '離線模式';
-            }
-        }
-
-        // 顯示訊息
-        function showMessage(message, type) {
-            const messageDiv = document.getElementById('configMessage');
-            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
-            messageDiv.textContent = message;
-            
-            setTimeout(() => {
-                messageDiv.textContent = '';
-                messageDiv.className = '';
-            }, 5000);
-        }
-
-        // 載入交易記錄
-        async function loadTrades() {
-            if (!apiUrl) {
-                document.getElementById('tradeLog').innerHTML = 
-                    '<div class="empty-log">請先設定 API 網址以啟用雲端同步</div>';
-                return;
-            }
-
-            updateSyncStatus('syncing');
-            document.getElementById('tradeLog').innerHTML = '<div class="loading">正在載入交易記錄...</div>';
-
-            try {
-                const response = await fetch(`${apiUrl}?action=getTrades`);
-                const result = await response.json();
                 
-                if (result.success) {
-                    trades = result.data || [];
-                    updateStats();
-                    displayTrades();
-                    updateSyncStatus('online');
-                } else {
-                    throw new Error(result.error || '載入失敗');
-                }
-            } catch (error) {
-                console.error('載入交易記錄失敗:', error);
-                showMessage(`載入失敗: ${error.message}`, 'error');
-                updateSyncStatus('error');
+                // 提供詳細的錯誤診斷和解決方案
+                let errorMessage = `連線測試失敗: ${error.message}\n\n`;
                 
-                document.getElementById('tradeLog').innerHTML = 
-                    `<div class="error-message">載入失敗: ${error.message}<br>請檢查網路連線或 API 設定</div>`;
-            }
-        }
-
-        // 儲存交易記錄
-        async function saveTrade(tradeData) {
-            if (!apiUrl) {
-                showMessage('請先設定 API 網址', 'error');
-                return false;
-            }
-
-            updateSyncStatus('syncing');
-            
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'addTrade',
-                        data: tradeData
-                    })
-                });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    updateSyncStatus('online');
-                    return true;
-                } else {
-                    throw new Error(result.error || '儲存失敗');
-                }
-            } catch (error) {
-                console.error('儲存交易記錄失敗:', error);
-                showMessage(`儲存失敗: ${error.message}`, 'error');
-                updateSyncStatus('error');
-                return false;
-            }
-        }
-
-        // 更新統計資料
-        function updateStats() {
-            const consignmentTrades = trades.filter(trade => trade.tradeType === 'consignment');
-            const purchaseTrades = trades.filter(trade => trade.tradeType === 'purchase');
-            const pendingTrades = trades.filter(trade => trade.status === 'pending');
-
-            document.getElementById('totalConsignment').textContent = consignmentTrades.length;
-            document.getElementById('totalPurchase').textContent = purchaseTrades.length;
-            document.getElementById('pendingTrades').textContent = pendingTrades.length;
-        }
-
-        // 顯示交易記錄
-        function displayTrades() {
-            const logContainer = document.getElementById('tradeLog');
-            
-            // 根據當前篩選器過濾資料
-            let filteredTrades = trades;
-            switch(currentLogFilter) {
-                case 'consignment':
-                    filteredTrades = trades.filter(trade => trade.tradeType === 'consignment');
-                    break;
-                case 'purchase':
-                    filteredTrades = trades.filter(trade => trade.tradeType === 'purchase');
-                    break;
-                case 'pending':
-                    filteredTrades = trades.filter(trade => trade.status === 'pending');
-                    break;
-            }
-            
-            if (filteredTrades.length === 0) {
-                const filterText = currentLogFilter === 'all' ? '交易記錄' : 
-                                 currentLogFilter === 'consignment' ? '代售記錄' :
-                                 currentLogFilter === 'purchase' ? '代收記錄' : '待處理記錄';
-                logContainer.innerHTML = `<div class="empty-log">還沒有任何${filterText}<br>開始新增委託吧！</div>`;
-                return;
-            }
-
-            const tradesHtml = filteredTrades.map((trade, index) => {
-                // 設定道具類型顯示文字
-                let typeText;
-                switch(trade.itemType) {
-                    case 'equipment': typeText = '裝備'; break;
-                    case 'scroll': typeText = '捲軸'; break;
-                    case 'quest': typeText = '任務道具'; break;
-                    case 'mineral': typeText = '礦物'; break;
-                    case 'bag': typeText = '背包'; break;
-                    case 'potion': typeText = '藥水'; break;
-                    case 'cash': typeText = '商城道具'; break;
-                    default: typeText = trade.itemType;
-                }
-
-                const tradeTypeText = trade.tradeType === 'consignment' ? '代售' : '代收';
-                const tradeTypeClass = trade.tradeType === 'consignment' ? 'trade-type-consignment' : 'trade-type-purchase';
-                const itemClass = trade.tradeType === 'consignment' ? 'consignment' : 'purchase';
-                
-                const date = new Date(trade.timestamp).toLocaleString('zh-TW');
-                const statusText = trade.status === 'pending' ? '待處理' : '已完成';
-                const clientName = trade.tradeType === 'consignment' ? trade.seller : trade.buyer;
-
-                return `
-                    <div class="trade-item ${itemClass}">
-                        <div class="trade-item-header">
-                            <div class="trade-item-title">${trade.itemName} ${trade.quantity ? `x${trade.quantity}` : ''}</div>
-                            <div class="trade-item-type ${tradeTypeClass}">${tradeTypeText} - ${typeText}</div>
-                        </div>
-                        <div class="trade-item-details">
-                            <div><strong>委託人:</strong> ${clientName}</div>
-                            ${trade.quantity ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
-                            <div><strong>狀態:</strong> ${statusText}</div>
-                            <div><strong>時間:</strong> ${date}</div>
-                            ${trade.notes ? `<div><strong>備註:</strong> ${trade.notes}</div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }).reverse().join('');
-
-            logContainer.innerHTML = tradesHtml;
-        }
-
-        // 代售表單提交 - 修正版
-        document.getElementById('consignmentForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('consignSubmitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
-
-            const trade = {
-                tradeType: 'consignment',
-                itemName: document.getElementById('consign-itemName').value,
-                itemType: document.getElementById('consign-itemType').value,
-                seller: document.getElementById('consign-seller').value,
-                buyer: '', // 代售時買家為空
-                quantity: parseInt(document.getElementById('consign-quantity').value) || 1,
-                notes: document.getElementById('consign-notes').value,
-                timestamp: new Date().toISOString()
-            };
-
-            const success = await saveTrade(trade);
-            
-            if (success) {
-                this.reset();
-                await loadTrades();
-                showMessage('代售委託已成功提交！', 'success');
-            }
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = '📤 提交代售委託';
-        });
-
-        // 代收表單提交 - 修正版
-        document.getElementById('purchaseForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('purchaseSubmitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
-
-            const trade = {
-                tradeType: 'purchase',
-                itemName: document.getElementById('purchase-itemName').value,
-                itemType: document.getElementById('purchase-itemType').value,
-                seller: '', // 代收時賣家為空
-                buyer: document.getElementById('purchase-buyer').value,
-                quantity: parseInt(document.getElementById('purchase-quantity').value) || 1,
-                notes: document.getElementById('purchase-notes').value,
-                timestamp: new Date().toISOString()
-            };
-
-            const success = await saveTrade(trade);
-            
-            if (success) {
-                this.reset();
-                await loadTrades();
-                showMessage('代收委託已成功提交！', 'success');
-            }
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = '📥 提交代收委託';
-        });
-    </script>
-</body>
-</html>
+                if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+                    errorMessage += '🔧 CORS 問題解決方案:\n';
+                    errorMessage += '1. 請重新部署 Google Apps Script\n';
+                    errorMessage += '2. 確保部署設定為"任何人"可存取\n';
+                    errorMessage += '3. 在瀏覽器新頁面開啟此網址測試:\n';
+                    errorMessage += `${apiUrl}?action=test`;
+                } else if (error.message.includes('404')) {
+                    errorMessage += '❌ 請檢查 API 網址是否正確';
+                } else if (error.message.includes('403')) {
+                    errorMessage += '❌ 請檢查 Apps Script 的權限設定';
+                } else if (error.message.includes('超時') || error.message.includes('timeout')) {
+                    errorMessage += '⏰ 請求超時，請檢查網路連線或稍後再試';
+                } else if (error.message.includes('網路請求失敗')) {
+                    errorMessage += '
