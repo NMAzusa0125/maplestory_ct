@@ -449,7 +449,7 @@
                 <div class="sync-indicator" id="syncIndicator"></div>
                 <span id="syncStatus">離線模式</span>
             </div>
-            <h1>� 楓之谷 Artale 楓葉萬事屋</h1>
+            <h1>🍁 楓之谷 Artale 楓葉萬事屋</h1>
             <p>協助處理代售與代收道具交易</p>
         </div>
 
@@ -977,11 +977,25 @@
 
                 console.log(`提交${isConsignment ? '代售' : '代收'}委託:`, trade);
 
-                // 再次確認必要欄位是否填寫（值是否為空）
-                if (!trade.itemName || !trade.itemType || (isConsignment ? !trade.seller : !trade.buyer)) {
-                    showMessage('請填寫所有必要欄位', 'error');
-                    return; // 直接返回，按鈕恢復邏輯會在 finally 執行
+                // *** 修正：檢查下拉選單的選中值是否為空字串，而不是僅檢查元素是否存在 ***
+                // 預設的 <option value="">請選擇</option> 會導致 !trade.itemType 或 !trade.seller/buyer 為 true
+                if (!trade.itemName.trim()) {
+                    showMessage('請輸入道具名稱', 'error');
+                    return;
                 }
+                if (!trade.itemType.trim()) {
+                    showMessage('請選擇道具類型', 'error');
+                    return;
+                }
+                if (isConsignment && !trade.seller.trim()) {
+                    showMessage('代售委託請選擇委託人（賣家）', 'error');
+                    return;
+                }
+                if (!isConsignment && !trade.buyer.trim()) {
+                    showMessage('代收委託請選擇委託人（買家）', 'error');
+                    return;
+                }
+
 
                 const success = await saveTrade(trade); // 呼叫 API 儲存資料
                 if (success) {
