@@ -645,10 +645,26 @@
 
             // 記錄篩選按鈕
             document.getElementById('refreshTradesBtn')?.addEventListener('click', loadTrades);
-            document.getElementById('logTabAll')?.addEventListener('click', () => switchLogTab('all'));
-            document.getElementById('logTabConsignment')?.addEventListener('click', () => switchLogTab('consignment'));
-            document.getElementById('logTabPurchase')?.addEventListener('click', () => switchLogTab('purchase'));
-            document.getElementById('logTabPending')?.addEventListener('click', () => switchLogTab('pending'));
+            document.getElementById('logTabAll')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
+                switchLogTab('all');
+                event.currentTarget.classList.add('active'); // 確保 active 狀態
+            });
+            document.getElementById('logTabConsignment')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
+                switchLogTab('consignment');
+                event.currentTarget.classList.add('active'); // 確保 active 狀態
+            });
+            document.getElementById('logTabPurchase')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
+                switchLogTab('purchase');
+                event.currentTarget.classList.add('active'); // 確保 active 狀態
+            });
+            document.getElementById('logTabPending')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
+                switchLogTab('pending');
+                event.currentTarget.classList.add('active'); // 確保 active 狀態
+            });
+
+            // 處理表單提交事件
+            document.getElementById('consignmentForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'consignment'));
+            document.getElementById('purchaseForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'purchase'));
 
 
             if (apiUrl) {
@@ -759,7 +775,7 @@
             currentLogFilter = filter;
             document.querySelectorAll('.log-tab').forEach(btn => btn.classList.remove('active'));
             // 找到對應的按鈕並添加 active class
-            document.getElementById('logTab' + filter.charAt(0).toUpperCase() + filter.slice(1))?.classList.add('active'); // 處理 'all', 'consignment' 等
+            // 這裡不需要額外的 event.currentTarget.classList.add('active'); 因為在 DOMContentLoaded 已經處理了
             
             displayTrades();
         }
@@ -1078,8 +1094,9 @@
         }
 
         // 綁定表單事件
-        document.getElementById('consignmentForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'consignment'));
-        document.getElementById('purchaseForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'purchase'));
+        // 這些綁定仍然需要在 DOMContentLoaded 之後
+        // document.getElementById('consignmentForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'consignment'));
+        // document.getElementById('purchaseForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'purchase'));
 
         // 其他事件監聽器
         document.addEventListener('keydown', function(e) {
