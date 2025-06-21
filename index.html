@@ -601,7 +601,7 @@
             <div class="trade-log">
                 <h2>
                     📋記錄 
-                    <button class="refresh-btn" onclick="loadTrades()">🔄重整</button>
+                    <button class="refresh-btn" onclick="loadTrades()">�重整</button>
                 </h2>
                 
                 <div class="log-tabs">
@@ -943,39 +943,50 @@
 
                 // *** 修正：直接從 document 獲取元素，並明確檢查其存在性 ***
                 // 這樣可以避免 form.querySelector 在 display: none; 的 tab 內容中可能出現的問題
-                const itemNameEl = document.getElementById(`${tradeType}-itemName`);
-                const itemTypeEl = document.getElementById(`${tradeType}-itemType`);
-                const quantityEl = document.getElementById(`${tradeType}-quantity`);
-                const notesEl = document.getElementById(`${tradeType}-notes`);
+                const itemNameId = `${tradeType}-itemName`;
+                const itemTypeId = `${tradeType}-itemType`;
+                const quantityId = `${tradeType}-quantity`;
+                const notesId = `${tradeType}-notes`;
+                const sellerId = `${tradeType}-seller`;
+                const buyerId = `${tradeType}-buyer`;
+
+                console.log(`嘗試獲取元素 ID: ${itemNameId}`); // 明確打印目標 ID
+                const itemNameEl = document.getElementById(itemNameId);
+                console.log(`結果:`, itemNameEl); // 打印獲取結果
+
+                console.log(`嘗試獲取元素 ID: ${itemTypeId}`);
+                const itemTypeEl = document.getElementById(itemTypeId);
+                console.log(`結果:`, itemTypeEl);
+
+                console.log(`嘗試獲取元素 ID: ${quantityId}`);
+                const quantityEl = document.getElementById(quantityId);
+                console.log(`結果:`, quantityEl);
+
+                console.log(`嘗試獲取元素 ID: ${notesId}`);
+                const notesEl = document.getElementById(notesId);
+                console.log(`結果:`, notesEl);
 
                 let sellerEl = null;
                 let buyerEl = null;
 
                 if (isConsignment) {
-                    sellerEl = document.getElementById(`${tradeType}-seller`);
+                    console.log(`嘗試獲取元素 ID: ${sellerId}`);
+                    sellerEl = document.getElementById(sellerId);
+                    console.log(`結果:`, sellerEl);
                 } else {
-                    buyerEl = document.getElementById(`${tradeType}-buyer`);
-                }
-
-                // *** 新增日誌：打印出查找的 ID 和結果 ***
-                console.log(`查找元素 ID: ${tradeType}-itemName, 結果:`, itemNameEl);
-                console.log(`查找元素 ID: ${tradeType}-itemType, 結果:`, itemTypeEl);
-                console.log(`查找元素 ID: ${tradeType}-quantity, 結果:`, quantityEl);
-                console.log(`查找元素 ID: ${tradeType}-notes, 結果:`, notesEl);
-                if (isConsignment) {
-                    console.log(`查找元素 ID: ${tradeType}-seller, 結果:`, sellerEl);
-                } else {
-                    console.log(`查找元素 ID: ${tradeType}-buyer, 結果:`, buyerEl);
+                    console.log(`嘗試獲取元素 ID: ${buyerId}`);
+                    buyerEl = document.getElementById(buyerId);
+                    console.log(`結果:`, buyerEl);
                 }
 
 
                 // 嚴格檢查所有必要元素是否存在
-                if (!itemNameEl) { console.error(`錯誤: 找不到 ${tradeType}-itemName 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemName 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${tradeType}-itemType 元素`); showMessage(`錯誤: 找不到 ${tradeType}-itemType 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!quantityEl) { console.error(`錯誤: 找不到 ${tradeType}-quantity 元素`); showMessage(`錯誤: 找不到 ${tradeType}-quantity 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!notesEl) { console.error(`錯誤: 找不到 ${tradeType}-notes 元素`); showMessage(`錯誤: 找不到 ${tradeType}-notes 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${tradeType}-seller 元素`); showMessage(`錯誤: 找不到 ${tradeType}-seller 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${tradeType}-buyer 元素`); showMessage(`錯誤: 找不到 ${tradeType}-buyer 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!itemNameEl) { console.error(`錯誤: 找不到 ${itemNameId} 元素`); showMessage(`錯誤: 找不到 ${itemNameId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${itemTypeId} 元素`); showMessage(`錯誤: 找不到 ${itemTypeId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!quantityEl) { console.error(`錯誤: 找不到 ${quantityId} 元素`); showMessage(`錯誤: 找不到 ${quantityId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!notesEl) { console.error(`錯誤: 找不到 ${notesId} 元素`); showMessage(`錯誤: 找不到 ${notesId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${sellerId} 元素`); showMessage(`錯誤: 找不到 ${sellerId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
+                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${buyerId} 元素`); showMessage(`錯誤: 找不到 ${buyerId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
 
 
                 const trade = {
