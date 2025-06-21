@@ -864,4 +864,356 @@
                 } else if (error.message.includes('超時') || error.message.includes('timeout')) {
                     errorMessage += '⏰ 請求超時，請檢查網路連線或稍後再試';
                 } else if (error.message.includes('網路請求失敗')) {
-                    errorMessage += '
+                    errorMessage += '🌐 網路連線問題，請檢查網路設定';
+                }
+                
+                showMessage(errorMessage, 'error');
+                updateSyncStatus('error');
+            }
+        }
+
+        // 更新同步狀態
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('syncIndicator');
+            const statusText = document.getElementById('syncStatus');
+            
+            if (!indicator || !statusText) return; // 防止元素不存在的錯誤
+            
+            // 重置所有 class
+            indicator.className = 'sync-indicator';
+            
+            switch(status) {
+                case 'online':
+                    statusText.textContent = '已連線';
+                    statusText.style.color = '#4CAF50';
+                    break;
+                case 'syncing':
+                    indicator.classList.add('syncing');
+                    statusText.textContent = '同步中...';
+                    statusText.style.color = '#FFC107';
+                    break;
+                case 'error':
+                    indicator.classList.add('error');
+                    statusText.textContent = '連線錯誤';
+                    statusText.style.color = '#f44336';
+                    break;
+                default:
+                    statusText.textContent = '離線模式';
+                    statusText.style.color = '#9E9E9E';
+            }
+        }
+
+        // 顯示訊息
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('configMessage');
+            if (!messageDiv) return; // 防止元素不存在的錯誤
+            
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.innerHTML = message.replace(/\n/g, '<br>');
+            
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 8000);
+        }
+
+        // 載入交易記錄
+        async function loadTrades() {
+            if (!apiUrl) {
+                const tradeLog = document.getElementById('tradeLog');
+                if (tradeLog) {
+                    tradeLog.innerHTML = '<div class="empty-log">請先設定 API 網址以啟用雲端同步</div>';
+                }
+                return;
+            }
+
+            updateSyncStatus('syncing');
+            const tradeLog = document.getElementById('tradeLog');
+            if (tradeLog) {
+                tradeLog.innerHTML = '<div class="loading">正在載入交易記錄...</div>';
+            }
+
+            try {
+                const result = await makeApiRequest('GET', 'getTrades');
+                trades = result.data || [];
+                console.log(`成功載入 ${trades.length} 筆交易記錄`);
+                
+                updateStats();
+                displayTrades();
+                updateSyncStatus('online');
+                
+                if (trades.length === 0) {
+                    showMessage('目前沒有任何交易記錄，開始新增第一筆委託吧！', 'success');
+                }
+            } catch (error) {
+                console.error('載入交易記錄失敗:', error);
+                showMessage(`載入失敗: ${error.message}`, 'error');
+                updateSyncStatus('error');
+                
+                if (tradeLog) {
+                    tradeLog.innerHTML = 
+                        `<div class="error-message">
+                            載入失敗: ${error.message}<br>
+                            <small>請檢查網路連線或 API 設定</small>
+                        </div>`;
+                }
+            }
+        }
+
+        // 儲存交易記錄
+        async function saveTrade(tradeData) {
+            if (!apiUrl) {
+                showMessage('請先設定 API 網址', 'error');
+                return false;
+            }
+
+            updateSyncStatus('syncing');
+            
+            try {
+                // 使用 GET 方式傳遞數據（通過 JSONP）
+                const result = await makeApiRequest('GET', 'addTrade', tradeData);
+                
+                console.log('交易儲存成功:', result);
+                updateSyncStatus('online');
+                return true;
+            } catch (error) {
+                console.error('儲存交易記錄失敗:', error);
+                showMessage(`儲存失敗: ${error.message}`, 'error');
+                updateSyncStatus('error');
+                return false;
+            }
+        }
+
+        // 更新統計資料
+        function updateStats() {
+            const consignmentTrades = trades.filter(trade => trade.tradeType === 'consignment');
+            const purchaseTrades = trades.filter(trade => trade.tradeType === 'purchase');
+            const pendingTrades = trades.filter(trade => trade.status === 'pending');
+
+            // 安全地更新統計數據
+            const totalConsignment = document.getElementById('totalConsignment');
+            const totalPurchase = document.getElementById('totalPurchase');
+            const pendingTradesEl = document.getElementById('pendingTrades');
+            
+            if (totalConsignment) totalConsignment.textContent = consignmentTrades.length;
+            if (totalPurchase) totalPurchase.textContent = purchaseTrades.length;
+            if (pendingTradesEl) pendingTradesEl.textContent = pendingTrades.length;
+        }
+
+        // 顯示交易記錄
+        function displayTrades() {
+            const logContainer = document.getElementById('tradeLog');
+            if (!logContainer) return;
+            
+            // 根據當前篩選器過濾資料
+            let filteredTrades = trades;
+            switch(currentLogFilter) {
+                case 'consignment':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'consignment');
+                    break;
+                case 'purchase':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'purchase');
+                    break;
+                case 'pending':
+                    filteredTrades = trades.filter(trade => trade.status === 'pending');
+                    break;
+            }
+            
+            if (filteredTrades.length === 0) {
+                const filterText = currentLogFilter === 'all' ? '交易記錄' : 
+                                currentLogFilter === 'consignment' ? '代售記錄' :
+                                currentLogFilter === 'purchase' ? '代收記錄' : '待處理記錄';
+                logContainer.innerHTML = `<div class="empty-log">還沒有任何${filterText}<br>開始新增委託吧！</div>`;
+                return;
+            }
+
+            const tradesHtml = filteredTrades.map((trade, index) => {
+                // 設定道具類型顯示文字
+                let typeText;
+                switch(trade.itemType) {
+                    case 'equipment': typeText = '裝備'; break;
+                    case 'scroll': typeText = '捲軸'; break;
+                    case 'quest': typeText = '任務道具'; break;
+                    case 'mineral': typeText = '礦物'; break;
+                    case 'bag': typeText = '背包'; break;
+                    case 'potion': typeText = '藥水'; break;
+                    case 'cash': typeText = '商城道具'; break;
+                    default: typeText = trade.itemType || '未知';
+                }
+
+                const tradeTypeText = trade.tradeType === 'consignment' ? '代售' : '代收';
+                const tradeTypeClass = trade.tradeType === 'consignment' ? 'trade-type-consignment' : 'trade-type-purchase';
+                const itemClass = trade.tradeType === 'consignment' ? 'consignment' : 'purchase';
+                
+                // 安全地處理時間戳記
+                let date;
+                try {
+                    date = new Date(trade.timestamp).toLocaleString('zh-TW');
+                } catch (e) {
+                    date = '無效時間';
+                }
+                
+                const statusText = trade.status === 'pending' ? '待處理' : '已完成';
+                const clientName = trade.tradeType === 'consignment' ? trade.seller : trade.buyer;
+
+                return `
+                    <div class="trade-item ${itemClass}">
+                        <div class="trade-item-header">
+                            <div class="trade-item-title">${trade.itemName || '未知道具'} ${trade.quantity ? `x${trade.quantity}` : ''}</div>
+                            <div class="trade-item-type ${tradeTypeClass}">${tradeTypeText} - ${typeText}</div>
+                        </div>
+                        <div class="trade-item-details">
+                            <div><strong>委託人:</strong> ${clientName || '未知'}</div>
+                            ${trade.quantity ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
+                            <div><strong>狀態:</strong> ${statusText}</div>
+                            <div><strong>時間:</strong> ${date}</div>
+                            ${trade.notes ? `<div><strong>備註:</strong> ${trade.notes}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            logContainer.innerHTML = tradesHtml;
+        }
+
+        // 代售表單提交
+        document.getElementById('consignmentForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('consignSubmitBtn');
+            if (!submitBtn) return;
+            
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            const trade = {
+                tradeType: 'consignment',
+                itemName: document.getElementById('consign-itemName')?.value || '',
+                itemType: document.getElementById('consign-itemType')?.value || '',
+                seller: document.getElementById('consign-seller')?.value || '',
+                buyer: '', // 代售時買家為空
+                quantity: parseInt(document.getElementById('consign-quantity')?.value) || 1,
+                notes: document.getElementById('consign-notes')?.value || '',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('提交代售委託:', trade);
+
+            // 簡單驗證
+            if (!trade.itemName || !trade.itemType || !trade.seller) {
+                showMessage('請填寫所有必要欄位', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                return;
+            }
+
+            const success = await saveTrade(trade);
+            
+            if (success) {
+                this.reset();
+                await loadTrades(); // 重新載入記錄
+                showMessage('代售委託已成功提交！', 'success');
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        });
+
+        // 代收表單提交
+        document.getElementById('purchaseForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('purchaseSubmitBtn');
+            if (!submitBtn) return;
+            
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            const trade = {
+                tradeType: 'purchase',
+                itemName: document.getElementById('purchase-itemName')?.value || '',
+                itemType: document.getElementById('purchase-itemType')?.value || '',
+                seller: '', // 代收時賣家為空
+                buyer: document.getElementById('purchase-buyer')?.value || '',
+                quantity: parseInt(document.getElementById('purchase-quantity')?.value) || 1,
+                notes: document.getElementById('purchase-notes')?.value || '',
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('提交代收委託:', trade);
+
+            // 簡單驗證
+            if (!trade.itemName || !trade.itemType || !trade.buyer) {
+                showMessage('請填寫所有必要欄位', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+                return;
+            }
+
+            const success = await saveTrade(trade);
+            
+            if (success) {
+                this.reset();
+                await loadTrades(); // 重新載入記錄
+                showMessage('代收委託已成功提交！', 'success');
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        });
+
+        // 鍵盤快捷鍵支援
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+R: 重新載入交易記錄
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                loadTrades();
+            }
+            
+            // Ctrl+T: 測試連線
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                testConnection();
+            }
+        });
+
+        // 自動儲存 API 設定
+        document.getElementById('apiUrl')?.addEventListener('input', function() {
+            clearTimeout(this.saveTimeout);
+            this.saveTimeout = setTimeout(() => {
+                if (this.value.trim() && this.value.includes('script.google.com')) {
+                    localStorage.setItem('consignmentApiUrl', this.value.trim());
+                    apiUrl = this.value.trim();
+                }
+            }, 1000);
+        });
+
+        // 錯誤恢復機制
+        window.addEventListener('online', function() {
+            console.log('網路已恢復');
+            if (apiUrl) {
+                setTimeout(() => testConnection(), 1000);
+            }
+        });
+
+        window.addEventListener('offline', function() {
+            console.log('網路已斷線');
+            updateSyncStatus('error');
+            showMessage('網路連線已斷開，請檢查網路設定', 'error');
+        });
+
+        // 頁面可見性變化時重新連線
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && apiUrl) {
+                setTimeout(() => {
+                    testConnection();
+                }, 2000);
+            }
+        });
+
+        console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v5.0 修正版');
+    </script>
+</body>
+</html>
