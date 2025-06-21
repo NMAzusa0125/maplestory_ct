@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>楓之谷 Artale 代售代收系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .sync-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sync-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .sync-indicator.syncing {
+            background: #FFC107;
+            animation: spin 1s linear infinite;
+        }
+
+        .sync-indicator.error {
+            background: #f44336;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .config-section {
+            background: #e8f5e8;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            color: #2E7D32;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .config-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .config-input input {
+            flex: 1;
+            min-width: 300px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .config-input button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .config-input button:hover {
+            background: #45a049;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            border-top: 4px solid #ff6b6b;
+        }
+
+        .stat-card h3 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 15px;
+            background: #f0f0f0;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+        }
+
+        .tab-button:hover {
+            background: #e0e0e0;
+        }
+
+        .tab-button.active:hover {
+            background: linear-gradient(45deg, #ff5252, #ff8f00);
+        }
+
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-left: 5px solid #ff6b6b;
+        }
+
+        .form-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        input, select, textarea {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ffa500);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+            display: block;
+            width: auto;
+            max-width: 200px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .trade-log {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .trade-log h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+
+        .log-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .log-tab {
+            padding: 10px 20px;
+            background: #ddd;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .log-tab.active {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .trade-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #ff6b6b;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .trade-item.consignment {
+            border-left-color: #4CAF50;
+        }
+
+        .trade-item.purchase {
+            border-left-color: #2196F3;
+        }
+
+        .trade-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .trade-item-title {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .trade-item-type {
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            color: white;
+        }
+
+        .trade-type-consignment {
+            background: #4CAF50;
+        }
+
+        .trade-type-purchase {
+            background: #2196F3;
+        }
+
+        .trade-item-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .empty-log {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+            padding: 40px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #f44336;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #4caf50;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+
+            .config-input {
+                flex-direction: column;
+            }
+
+            .config-input input {
+                min-width: 100%;
+            }
+
+            .form-tabs {
+                flex-direction: column;
+            }
+
+            .log-tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="sync-status">
+                <div class="sync-indicator" id="syncIndicator"></div>
+                <span id="syncStatus">離線模式</span>
+            </div>
+            <h1>🍁 楓之谷 Artale 代售代收系統</h1>
+            <p>協助處理代售與代收道具交易</p>
+        </div>
+
+        <div class="main-content">
+            <div class="config-section">
+                <h3>⚙️ 雲端同步設定</h3>
+                <div class="config-input">
+                    <input type="url" id="apiUrl" placeholder="請輸入 Google Apps Script API 網址" />
+                    <button onclick="saveApiConfig()">儲存設定</button>
+                    <button onclick="testConnection()">測試連線</button>
+                </div>
+                <div id="configMessage"></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>總代售筆數</h3>
+                    <div class="stat-value" id="totalConsignment">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>總代收筆數</h3>
+                    <div class="stat-value" id="totalPurchase">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>待處理交易</h3>
+                    <div class="stat-value" id="pendingTrades">0</div>
+                </div>
+            </div>
+
+            <div class="form-tabs">
+                <button class="tab-button active" onclick="switchTab('consignment')">📤 代售委託</button>
+                <button class="tab-button" onclick="switchTab('purchase')">📥 代收委託</button>
+            </div>
+
+            <!-- 代售表單 -->
+            <div id="consignment-tab" class="tab-content active">
+                <div class="form-section">
+                    <h2>📤 新增代售委託</h2>
+                    <form id="consignmentForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="consign-itemName">道具名稱</label>
+                                <input type="text" id="consign-itemName" required placeholder="輸入道具名稱">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="consign-itemType">道具類型</label>
+                                <select id="consign-itemType" required>
+                                    <option value="">請選擇</option>
+                                    <option value="equipment">裝備 (20% 手續費)</option>
+                                    <option value="scroll">捲軸 (10% 手續費)</option>
+                                    <option value="quest">任務道具 (10% 手續費)</option>
+                                    <option value="mineral">礦物 (10% 手續費)</option>
+                                    <option value="bag">背包 (10% 手續費)</option>
+                                    <option value="potion">藥水 (10% 手續費)</option>
+                                    <option value="cash">商城道具 (10% 手續費)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="consign-seller">委託人（賣家）</label>
+                                <select id="consign-seller" required>
+                                    <option value="">請選擇委託人</option>
+                                    <option value="貓貓">貓貓</option>
+                                    <option value="猴子">猴子</option>
+                                    <option value="雪喵">雪喵</option>
+                                    <option value="鯊鯊">鯊鯊</option>
+                                    <option value="楓葉">楓葉</option>
+                                    <option value="倉鼠">倉鼠</option>
+                                    <option value="lichuann">lichuann</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="consign-quantity">道具數量</label>
+                                <input type="number" id="consign-quantity" required min="1" value="1" placeholder="輸入道具數量">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="consign-notes">備註 (選填)</label>
+                            <textarea id="consign-notes" rows="3" placeholder="委託說明或特殊要求"></textarea>
+                        </div>
+
+                        <div style="margin-top: 30px;">
+                            <button type="submit" class="btn" id="consignSubmitBtn">📤 提交代售委託</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 代收表單 -->
+            <div id="purchase-tab" class="tab-content">
+                <div class="form-section">
+                    <h2>📥 新增代收委託</h2>
+                    <form id="purchaseForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="purchase-itemName">道具名稱</label>
+                                <input type="text" id="purchase-itemName" required placeholder="輸入道具名稱">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="purchase-itemType">道具類型</label>
+                                <select id="purchase-itemType" required>
+                                    <option value="">請選擇</option>
+                                    <option value="equipment">裝備 (20% 手續費)</option>
+                                    <option value="scroll">捲軸 (10% 手續費)</option>
+                                    <option value="quest">任務道具 (10% 手續費)</option>
+                                    <option value="mineral">礦物 (10% 手續費)</option>
+                                    <option value="bag">背包 (10% 手續費)</option>
+                                    <option value="potion">藥水 (10% 手續費)</option>
+                                    <option value="cash">商城道具 (10% 手續費)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="purchase-buyer">委託人（買家）</label>
+                                <select id="purchase-buyer" required>
+                                    <option value="">請選擇委託人</option>
+                                    <option value="貓貓">貓貓</option>
+                                    <option value="猴子">猴子</option>
+                                    <option value="雪喵">雪喵</option>
+                                    <option value="鯊鯊">鯊鯊</option>
+                                    <option value="楓葉">楓葉</option>
+                                    <option value="倉鼠">倉鼠</option>
+                                    <option value="lichuann">lichuann</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="purchase-quantity">道具數量</label>
+                                <input type="number" id="purchase-quantity" required min="1" value="1" placeholder="輸入道具數量">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="purchase-notes">備註 (選填)</label>
+                            <textarea id="purchase-notes" rows="3" placeholder="委託說明或特殊要求"></textarea>
+                        </div>
+
+                        <div style="margin-top: 30px;">
+                            <button type="submit" class="btn" id="purchaseSubmitBtn">📥 提交代收委託</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="trade-log">
+                <h2>
+                    📋 交易記錄 
+                    <button class="refresh-btn" onclick="loadTrades()">🔄 重新整理</button>
+                </h2>
+                
+                <div class="log-tabs">
+                    <button class="log-tab active" onclick="switchLogTab('all')">全部</button>
+                    <button class="log-tab" onclick="switchLogTab('consignment')">代售</button>
+                    <button class="log-tab" onclick="switchLogTab('purchase')">代收</button>
+                    <button class="log-tab" onclick="switchLogTab('pending')">待處理</button>
+                </div>
+
+                <div id="tradeLog">
+                    <div class="loading">正在載入交易記錄...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trades = [];
+        let apiUrl = localStorage.getItem('consignmentApiUrl') || '';
+        let currentLogFilter = 'all';
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            if (apiUrl) {
+                document.getElementById('apiUrl').value = apiUrl;
+                loadTrades();
+            }
+            updateSyncStatus('offline');
+        });
+
+        // 切換標籤
+        function switchTab(tabName) {
+            // 更新按鈕狀態
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 更新內容顯示
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        // 切換記錄標籤
+        function switchLogTab(filter) {
+            currentLogFilter = filter;
+            document.querySelectorAll('.log-tab').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            displayTrades();
+        }
+
+        // 儲存 API 設定
+        function saveApiConfig() {
+            const url = document.getElementById('apiUrl').value.trim();
+            if (!url) {
+                showMessage('請輸入有效的 API 網址', 'error');
+                return;
+            }
+            
+            localStorage.setItem('consignmentApiUrl', url);
+            apiUrl = url;
+            showMessage('API 設定已儲存', 'success');
+            loadTrades();
+        }
+
+        // 測試連線
+        async function testConnection() {
+            if (!apiUrl) {
+                showMessage('請先輸入 API 網址', 'error');
+                return;
+            }
+
+            updateSyncStatus('syncing');
+            
+            try {
+                const response = await fetch(`${apiUrl}?action=test`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('連線測試成功！', 'success');
+                    updateSyncStatus('online');
+                } else {
+                    throw new Error(result.error || '連線失敗');
+                }
+            } catch (error) {
+                console.error('連線測試失敗:', error);
+                showMessage(`連線測試失敗: ${error.message}`, 'error');
+                updateSyncStatus('error');
+            }
+        }
+
+        // 更新同步狀態
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('syncIndicator');
+            const statusText = document.getElementById('syncStatus');
+            
+            indicator.className = 'sync-indicator';
+            
+            switch(status) {
+                case 'online':
+                    statusText.textContent = '已連線';
+                    break;
+                case 'syncing':
+                    indicator.classList.add('syncing');
+                    statusText.textContent = '同步中...';
+                    break;
+                case 'error':
+                    indicator.classList.add('error');
+                    statusText.textContent = '連線錯誤';
+                    break;
+                default:
+                    statusText.textContent = '離線模式';
+            }
+        }
+
+        // 顯示訊息
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('configMessage');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = message;
+            
+            setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = '';
+            }, 5000);
+        }
+
+        // 載入交易記錄
+        async function loadTrades() {
+            if (!apiUrl) {
+                document.getElementById('tradeLog').innerHTML = 
+                    '<div class="empty-log">請先設定 API 網址以啟用雲端同步</div>';
+                return;
+            }
+
+            updateSyncStatus('syncing');
+            document.getElementById('tradeLog').innerHTML = '<div class="loading">正在載入交易記錄...</div>';
+
+            try {
+                const response = await fetch(`${apiUrl}?action=getTrades`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    trades = result.data || [];
+                    updateStats();
+                    displayTrades();
+                    updateSyncStatus('online');
+                } else {
+                    throw new Error(result.error || '載入失敗');
+                }
+            } catch (error) {
+                console.error('載入交易記錄失敗:', error);
+                showMessage(`載入失敗: ${error.message}`, 'error');
+                updateSyncStatus('error');
+                
+                document.getElementById('tradeLog').innerHTML = 
+                    `<div class="error-message">載入失敗: ${error.message}<br>請檢查網路連線或 API 設定</div>`;
+            }
+        }
+
+        // 儲存交易記錄
+        async function saveTrade(tradeData) {
+            if (!apiUrl) {
+                showMessage('請先設定 API 網址', 'error');
+                return false;
+            }
+
+            updateSyncStatus('syncing');
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'addTrade',
+                        data: tradeData
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateSyncStatus('online');
+                    return true;
+                } else {
+                    throw new Error(result.error || '儲存失敗');
+                }
+            } catch (error) {
+                console.error('儲存交易記錄失敗:', error);
+                showMessage(`儲存失敗: ${error.message}`, 'error');
+                updateSyncStatus('error');
+                return false;
+            }
+        }
+
+        // 更新統計資料
+        function updateStats() {
+            const consignmentTrades = trades.filter(trade => trade.tradeType === 'consignment');
+            const purchaseTrades = trades.filter(trade => trade.tradeType === 'purchase');
+            const pendingTrades = trades.filter(trade => trade.status === 'pending');
+
+            document.getElementById('totalConsignment').textContent = consignmentTrades.length;
+            document.getElementById('totalPurchase').textContent = purchaseTrades.length;
+            document.getElementById('pendingTrades').textContent = pendingTrades.length;
+        }
+
+        // 顯示交易記錄
+        function displayTrades() {
+            const logContainer = document.getElementById('tradeLog');
+            
+            // 根據當前篩選器過濾資料
+            let filteredTrades = trades;
+            switch(currentLogFilter) {
+                case 'consignment':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'consignment');
+                    break;
+                case 'purchase':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'purchase');
+                    break;
+                case 'pending':
+                    filteredTrades = trades.filter(trade => trade.status === 'pending');
+                    break;
+            }
+            
+            if (filteredTrades.length === 0) {
+                const filterText = currentLogFilter === 'all' ? '交易記錄' : 
+                                 currentLogFilter === 'consignment' ? '代售記錄' :
+                                 currentLogFilter === 'purchase' ? '代收記錄' : '待處理記錄';
+                logContainer.innerHTML = `<div class="empty-log">還沒有任何${filterText}<br>開始新增委託吧！</div>`;
+                return;
+            }
+
+            const tradesHtml = filteredTrades.map((trade, index) => {
+                // 設定道具類型顯示文字
+                let typeText;
+                switch(trade.itemType) {
+                    case 'equipment': typeText = '裝備'; break;
+                    case 'scroll': typeText = '捲軸'; break;
+                    case 'quest': typeText = '任務道具'; break;
+                    case 'mineral': typeText = '礦物'; break;
+                    case 'bag': typeText = '背包'; break;
+                    case 'potion': typeText = '藥水'; break;
+                    case 'cash': typeText = '商城道具'; break;
+                    default: typeText = trade.itemType;
+                }
+
+                const tradeTypeText = trade.tradeType === 'consignment' ? '代售' : '代收';
+                const tradeTypeClass = trade.tradeType === 'consignment' ? 'trade-type-consignment' : 'trade-type-purchase';
+                const itemClass = trade.tradeType === 'consignment' ? 'consignment' : 'purchase';
+                
+                const date = new Date(trade.timestamp).toLocaleString('zh-TW');
+                const statusText = trade.status === 'pending' ? '待處理' : '已完成';
+                const clientName = trade.tradeType === 'consignment' ? trade.seller : trade.buyer;
+
+                return `
+                    <div class="trade-item ${itemClass}">
+                        <div class="trade-item-header">
+                            <div class="trade-item-title">${trade.itemName} ${trade.quantity ? `x${trade.quantity}` : ''}</div>
+                            <div class="trade-item-type ${tradeTypeClass}">${tradeTypeText} - ${typeText}</div>
+                        </div>
+                        <div class="trade-item-details">
+                            <div><strong>委託人:</strong> ${clientName}</div>
+                            ${trade.quantity ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
+                            <div><strong>狀態:</strong> ${statusText}</div>
+                            <div><strong>時間:</strong> ${date}</div>
+                            ${trade.notes ? `<div><strong>備註:</strong> ${trade.notes}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).reverse().join('');
+
+            logContainer.innerHTML = tradesHtml;
+        }
+
+        // 代售表單提交
+        document.getElementById('consignmentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('consignSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            const trade = {
+                tradeType: 'consignment',
+                itemName: document.getElementById('consign-itemName').value,
+                itemType: document.getElementById('consign-itemType').value,
+                seller: document.getElementById('consign-seller').value,
+                buyer: '', // 代售時買家為空
+                quantity: parseInt(document.getElementById('consign-quantity').value) || 1,
+                amount: 0, // 前端不填金額
+                currency: '', // 前端不填貨幣
+                fee: 0,
+                netAmount: 0,
+                feeRate: document.getElementById('consign-itemType').value === 'equipment' ? 0.2 : 0.1,
+                notes: document.getElementById('consign-notes').value,
+                status: 'pending',
+                timestamp: new Date().toISOString()
+            };
+
+            const success = await saveTrade(trade);
+            
+            if (success) {
+                this.reset();
+                await loadTrades();
+                showMessage('代售委託已成功提交！', 'success');
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '📤 提交代售委託';
+        });
+
+        // 代收表單提交
+        document.getElementById('purchaseForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('purchaseSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '提交中...';
+
+            const trade = {
+                tradeType: 'purchase',
+                itemName: document.getElementById('purchase-itemName').value,
+                itemType: document.getElementById('purchase-itemType').value,
+                seller: '', // 代收時賣家為空
+                buyer: document.getElementById('purchase-buyer').value,
+                quantity: parseInt(document.getElementById('purchase-quantity').value) || 1,
+                amount: 0, // 前端不填金額
+                currency: '', // 前端不填貨幣
+                fee: 0,
+                netAmount: 0,
+                feeRate: document.getElementById('purchase-itemType').value === 'equipment' ? 0.2 : 0.1,
+                notes: document.getElementById('purchase-notes').value,
+                status: 'pending',
+                timestamp: new Date().toISOString()
+            };
+
+            const success = await saveTrade(trade);
+            
+            if (success) {
+                this.reset();
+                await loadTrades();
+                showMessage('代收委託已成功提交！', 'success');
+            }
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '📥 提交代收委託';
+        });
+    </script>
+</body>
+</html>
