@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>楓之谷 Artale 楓葉萬事屋</title>
     <style>
-        /* 保持原有的 CSS */
         * {
             margin: 0;
             padding: 0;
@@ -458,9 +457,8 @@
                 <h3>⚙️ 雲端同步設定</h3>
                 <div class="config-input">
                     <input type="url" id="apiUrl" placeholder="請輸入 Google Apps Script API 網址" />
-                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
-                    <button id="saveApiConfigBtn">儲存設定</button>
-                    <button id="testConnectionBtn">測試連線</button>
+                    <button onclick="saveApiConfig()">儲存設定</button>
+                    <button onclick="testConnection()">測試連線</button>
                 </div>
                 <div id="configMessage"></div>
             </div>
@@ -481,9 +479,8 @@
             </div>
 
             <div class="form-tabs">
-                <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
-                <button class="tab-button active" id="consignmentTabBtn">📤 代售委託</button>
-                <button class="tab-button" id="purchaseTabBtn">📥 代收委託</button>
+                <button class="tab-button active" onclick="switchTab('consignment')">📤 代售委託</button>
+                <button class="tab-button" onclick="switchTab('purchase')">📥 代收委託</button>
             </div>
 
             <!-- 代售表單 -->
@@ -603,16 +600,14 @@
             <div class="trade-log">
                 <h2>
                     📋記錄 
-                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
-                    <button class="refresh-btn" id="refreshTradesBtn">🔄重整</button>
+                    <button class="refresh-btn" onclick="loadTrades()">🔄重整</button>
                 </h2>
                 
                 <div class="log-tabs">
-                    <!-- 將 onclick 移除，改為 JavaScript 綁定 -->
-                    <button class="log-tab active" id="logTabAll">全部</button>
-                    <button class="log-tab" id="logTabConsignment">代售</button>
-                    <button class="log-tab" id="logTabPurchase">代收</button>
-                    <button class="log-tab" id="logTabPending">待處理</button>
+                    <button class="log-tab active" onclick="switchLogTab('all')">全部</button>
+                    <button class="log-tab" onclick="switchLogTab('consignment')">代售</button>
+                    <button class="log-tab" onclick="switchLogTab('purchase')">代收</button>
+                    <button class="log-tab" onclick="switchLogTab('pending')">待處理</button>
                 </div>
 
                 <div id="tradeLog">
@@ -622,98 +617,25 @@
         </div>
     </div>
 
-<script>
-    (function() { // 將整個腳本包裹在 IIFE 中
-
-        // 全域變數 (現在是 IIFE 的局部變數)
+    <script>
+        // 全域變數
         let trades = [];
         let apiUrl = localStorage.getItem('consignmentApiUrl') || '';
         let currentLogFilter = 'all';
 
-        // 初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('系統初始化...');
-            
-            // 綁定事件監聽器 - 新增的部分
-            // 配置區塊按鈕
-            document.getElementById('saveApiConfigBtn')?.addEventListener('click', saveApiConfig);
-            document.getElementById('testConnectionBtn')?.addEventListener('click', testConnection);
-
-            // 表單切換按鈕
-            document.getElementById('consignmentTabBtn')?.addEventListener('click', () => switchTab('consignment'));
-            document.getElementById('purchaseTabBtn')?.addEventListener('click', () => switchTab('purchase'));
-
-            // 記錄篩選按鈕
-            document.getElementById('refreshTradesBtn')?.addEventListener('click', loadTrades);
-            document.getElementById('logTabAll')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
-                switchLogTab('all');
-                event.currentTarget.classList.add('active'); // 確保 active 狀態
-            });
-            document.getElementById('logTabConsignment')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
-                switchLogTab('consignment');
-                event.currentTarget.classList.add('active'); // 確保 active 狀態
-            });
-            document.getElementById('logTabPurchase')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
-                switchLogTab('purchase');
-                event.currentTarget.classList.add('active'); // 確保 active 狀態
-            });
-            document.getElementById('logTabPending')?.addEventListener('click', (event) => { // 這裡需要傳遞 event
-                switchLogTab('pending');
-                event.currentTarget.classList.add('active'); // 確保 active 狀態
-            });
-
-            // 處理表單提交事件
-            document.getElementById('consignmentForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'consignment'));
-            document.getElementById('purchaseForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'purchase'));
-
-
-            if (apiUrl) {
-                document.getElementById('apiUrl').value = apiUrl;
-                updateSyncStatus('offline');
-                // 延遲載入以確保頁面完全載入
-                setTimeout(() => {
-                    testConnection();
-                }, 1000);
-            } else {
-                updateSyncStatus('offline');
-                showMessage('請先設定 Google Apps Script API 網址', 'error');
-            }
-        });
-
-        // =================================================================
-        // 【核心修改】更穩定、更標準的 API 請求函數
-        // =================================================================
-        function makeApiRequestJsonp(action, data = null) {
-            if (!apiUrl) {
-                return Promise.reject(new Error('請先設定 API 網址'));
-            }
-
+        // 純 JSONP 實現函數
+        function makeJsonpRequest(action, data = null) {
             return new Promise((resolve, reject) => {
+                if (!apiUrl) {
+                    reject(new Error('請先設定 API 網址'));
+                    return;
+                }
+                
                 const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 let script;
                 let timeoutId;
                 
-                // --- 修改開始 ---
-                // 使用 URLSearchParams 來建立查詢字串，這會自動處理所有特殊字元的編碼
-                // 這是最穩健、最推薦的做法，可以完全避免 'URI malformed' 錯誤
-                const params = new URLSearchParams();
-                params.append('action', action);
-                params.append('callback', callbackName);
-                
-                // 將 data 物件中的每一個屬性都加到 URL 參數中
-                if (data) {
-                    for (const key in data) {
-                        // 確保我們只處理物件自身的屬性
-                        if (Object.prototype.hasOwnProperty.call(data, key)) {
-                            params.append(key, data[key]);
-                        }
-                    }
-                }
-                
-                const url = `${apiUrl}?${params.toString()}`;
-                // --- 修改結束 ---
-                
-                console.log('JSONP 請求:', { action, url: url.substring(0, 150) + '...' });
+                console.log('發起 JSONP 請求:', { action, hasData: !!data });
                 
                 function cleanup() {
                     if (timeoutId) clearTimeout(timeoutId);
@@ -721,50 +643,63 @@
                     if (script && script.parentNode) script.parentNode.removeChild(script);
                 }
                 
-                window[callbackName] = function(response) {
-                    cleanup();
-                    console.log('JSONP 回應:', response);
-                    if (response && response.success) {
-                        resolve(response);
-                    } else {
-                        reject(new Error(response?.error || '請求失敗或後端發生錯誤'));
+                try {
+                    window[callbackName] = function(response) {
+                        cleanup();
+                        console.log('JSONP 回應:', response);
+                        
+                        if (response && response.success) {
+                            resolve(response);
+                        } else {
+                            reject(new Error(response?.error || '請求失敗'));
+                        }
+                    };
+                    
+                    let url = `${apiUrl}?action=${encodeURIComponent(action)}&callback=${callbackName}`;
+                    
+                    if (data) {
+                        try {
+                            const jsonStr = JSON.stringify(data);
+                            const encodedData = btoa(unescape(encodeURIComponent(jsonStr)));
+                            url += `&data=${encodeURIComponent(encodedData)}&encoding=base64`;
+                        } catch (encodeError) {
+                            cleanup();
+                            reject(new Error('數據編碼失敗: ' + encodeError.message));
+                            return;
+                        }
                     }
-                };
-                
-                script = document.createElement('script');
-                script.src = url;
-                script.onerror = function() {
+                    
+                    if (url.length > 8000) {
+                        cleanup();
+                        reject(new Error('請求數據過大，請縮短內容'));
+                        return;
+                    }
+                    
+                    script = document.createElement('script');
+                    script.src = url;
+                    script.onerror = function() {
+                        cleanup();
+                        reject(new Error('網路連接失敗'));
+                    };
+                    
+                    timeoutId = setTimeout(() => {
+                        cleanup();
+                        reject(new Error('請求超時'));
+                    }, 20000);
+                    
+                    document.head.appendChild(script);
+                    
+                } catch (error) {
                     cleanup();
-                    reject(new Error('網路請求失敗，請檢查網址或 CORS 設定'));
-                };
-                
-                timeoutId = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('請求超時 (15秒)'));
-                }, 15000);
-                
-                document.head.appendChild(script);
+                    reject(new Error('請求建立失敗: ' + error.message));
+                }
             });
-        }
-
-        // 統一的 API 請求函數 (無需修改，但現在會呼叫上面更新過的函式)
-        async function makeApiRequest(method, action, data = null) {
-            try {
-                console.log(`API 請求:`, { method, action, data });
-                const result = await makeApiRequestJsonp(action, data);
-                console.log('API 回應成功:', result);
-                return result;
-            } catch (error) {
-                console.error('API 請求失敗:', error);
-                throw error;
-            }
         }
 
         // 切換標籤
         function switchTab(tabName) {
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            // 找到對應的按鈕並添加 active class
-            document.getElementById(tabName + 'TabBtn').classList.add('active'); // 使用 ID 查找按鈕
+            event.target.classList.add('active');
             
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             document.getElementById(tabName + '-tab').classList.add('active');
@@ -774,42 +709,66 @@
         function switchLogTab(filter) {
             currentLogFilter = filter;
             document.querySelectorAll('.log-tab').forEach(btn => btn.classList.remove('active'));
-            // 找到對應的按鈕並添加 active class
-            // 這裡不需要額外的 event.currentTarget.classList.add('active'); 因為在 DOMContentLoaded 已經處理了
-            
+            event.target.classList.add('active');
             displayTrades();
         }
 
         // 儲存 API 設定
         function saveApiConfig() {
             const url = document.getElementById('apiUrl').value.trim();
-            if (!url || !url.includes('script.google.com')) {
-                showMessage('請輸入有效的 Google Apps Script 網址', 'error');
+            if (!url) {
+                showMessage('請輸入有效的 API 網址', 'error');
                 return;
             }
+            
+            if (!url.includes('script.google.com')) {
+                showMessage('請確認這是正確的 Google Apps Script 網址', 'error');
+                return;
+            }
+            
             localStorage.setItem('consignmentApiUrl', url);
             apiUrl = url;
             showMessage('API 設定已儲存', 'success');
-            setTimeout(() => testConnection(), 500);
+            
+            setTimeout(() => {
+                testConnection();
+            }, 500);
         }
 
         // 測試連線
         async function testConnection() {
-            if (!apiUrl) return showMessage('請先輸入 API 網址', 'error');
+            if (!apiUrl) {
+                showMessage('請先輸入 API 網址', 'error');
+                return;
+            }
+
             updateSyncStatus('syncing');
+            
             try {
-                const result = await makeApiRequest('GET', 'test');
-                showMessage(`連線測試成功！伺服器版本: ${result.version || 'v6.0'}`, 'success');
-                updateSyncStatus('online');
-                console.log('連線測試結果:', result);
-                setTimeout(() => loadTrades(), 500);
+                console.log('開始測試連線...');
+                const result = await makeJsonpRequest('test');
+                
+                if (result && result.success) {
+                    showMessage(`連線測試成功！伺服器版本: ${result.version || 'v6.1'}`, 'success');
+                    updateSyncStatus('online');
+                    console.log('連線測試結果:', result);
+                    
+                    setTimeout(() => {
+                        loadTrades();
+                    }, 1000);
+                } else {
+                    throw new Error(result?.error || '測試失敗');
+                }
+                
             } catch (error) {
+                console.error('連線測試失敗:', error);
+                
                 let errorMessage = `連線測試失敗: ${error.message}\n\n`;
                 errorMessage += '🔧 請檢查:\n';
                 errorMessage += '1. API 網址是否正確\n';
-                errorMessage += '2. Google Apps Script 是否已部署為「網頁應用程式」\n';
-                errorMessage += '3. 執行權限是否設為「任何人」\n';
-                errorMessage += `4. <a href="${apiUrl}?action=test" target="_blank">點此直接測試網址</a>`;
+                errorMessage += '2. Google Apps Script 是否已部署\n';
+                errorMessage += '3. 部署設定是否為"任何人"可存取\n';
+                
                 showMessage(errorMessage, 'error');
                 updateSyncStatus('error');
             }
@@ -819,25 +778,29 @@
         function updateSyncStatus(status) {
             const indicator = document.getElementById('syncIndicator');
             const statusText = document.getElementById('syncStatus');
+            
             if (!indicator || !statusText) return;
+            
             indicator.className = 'sync-indicator';
             
             switch(status) {
                 case 'online':
-                    indicator.style.background = '#4CAF50';
                     statusText.textContent = '已連線';
+                    statusText.style.color = '#4CAF50';
                     break;
                 case 'syncing':
                     indicator.classList.add('syncing');
                     statusText.textContent = '同步中...';
+                    statusText.style.color = '#FFC107';
                     break;
                 case 'error':
                     indicator.classList.add('error');
                     statusText.textContent = '連線錯誤';
+                    statusText.style.color = '#f44336';
                     break;
                 default:
-                    indicator.style.background = '#9E9E9E';
                     statusText.textContent = '離線模式';
+                    statusText.style.color = '#9E9E9E';
             }
         }
 
@@ -845,53 +808,84 @@
         function showMessage(message, type) {
             const messageDiv = document.getElementById('configMessage');
             if (!messageDiv) return;
+            
             messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
             messageDiv.innerHTML = message.replace(/\n/g, '<br>');
-            // 延遲清除訊息，讓使用者有時間閱讀
+            
             setTimeout(() => {
                 messageDiv.textContent = '';
                 messageDiv.className = '';
-            }, type === 'error' ? 12000 : 5000);
+            }, type === 'error' ? 10000 : 5000);
         }
 
         // 載入交易記錄
         async function loadTrades() {
-            const tradeLog = document.getElementById('tradeLog');
             if (!apiUrl) {
-                if (tradeLog) tradeLog.innerHTML = '<div class="empty-log">請先設定 API 網址以啟用雲端同步</div>';
+                const tradeLog = document.getElementById('tradeLog');
+                if (tradeLog) {
+                    tradeLog.innerHTML = '<div class="empty-log">請先設定 API 網址以啟用雲端同步</div>';
+                }
                 return;
             }
 
             updateSyncStatus('syncing');
-            if (tradeLog) tradeLog.innerHTML = '<div class="loading">正在載入交易記錄...</div>';
+            const tradeLog = document.getElementById('tradeLog');
+            if (tradeLog) {
+                tradeLog.innerHTML = '<div class="loading">正在載入交易記錄...</div>';
+            }
 
             try {
-                const result = await makeApiRequest('GET', 'getTrades');
-                trades = result.data || [];
-                console.log(`成功載入 ${trades.length} 筆交易記錄`);
-                updateStats();
-                displayTrades();
-                updateSyncStatus('online');
-                if (trades.length === 0) {
-                   showMessage('目前沒有任何交易記錄，開始新增第一筆委託吧！', 'success');
+                const result = await makeJsonpRequest('getTrades');
+                
+                if (result && result.success) {
+                    trades = result.data || [];
+                    console.log(`成功載入 ${trades.length} 筆交易記錄`);
+                    
+                    updateStats();
+                    displayTrades();
+                    updateSyncStatus('online');
+                    
+                    if (trades.length === 0) {
+                        showMessage('目前沒有任何交易記錄，開始新增第一筆委託吧！', 'success');
+                    }
+                } else {
+                    throw new Error(result?.error || '載入失敗');
                 }
             } catch (error) {
                 console.error('載入交易記錄失敗:', error);
                 showMessage(`載入失敗: ${error.message}`, 'error');
                 updateSyncStatus('error');
-                if (tradeLog) tradeLog.innerHTML = `<div class="error-message">載入失敗: ${error.message}<br><small>請檢查網路連線或 API 設定</small></div>`;
+                
+                if (tradeLog) {
+                    tradeLog.innerHTML = 
+                        `<div class="error-message">
+                            載入失敗: ${error.message}<br>
+                            <small>請檢查網路連線或 API 設定</small>
+                        </div>`;
+                }
             }
         }
 
-        // 儲存交易記錄 (現在會呼叫修正後的 API 函數)
+        // 儲存交易記錄
         async function saveTrade(tradeData) {
+            if (!apiUrl) {
+                showMessage('請先設定 API 網址', 'error');
+                return false;
+            }
+
             updateSyncStatus('syncing');
+            
             try {
-                // 我們是 GET 請求，所以第一個參數 'GET' 其實沒作用，但為了介面一致性保留
-                const result = await makeApiRequest('GET', 'addTrade', tradeData);
-                console.log('交易儲存成功:', result);
-                updateSyncStatus('online');
-                return true;
+                console.log('儲存交易記錄:', tradeData);
+                const result = await makeJsonpRequest('addTrade', tradeData);
+                
+                if (result && result.success) {
+                    console.log('交易儲存成功:', result);
+                    updateSyncStatus('online');
+                    return true;
+                } else {
+                    throw new Error(result?.error || '儲存失敗');
+                }
             } catch (error) {
                 console.error('儲存交易記錄失敗:', error);
                 showMessage(`儲存失敗: ${error.message}`, 'error');
@@ -902,52 +896,81 @@
 
         // 更新統計資料
         function updateStats() {
-            const consignmentTrades = trades.filter(t => t.tradeType === 'consignment');
-            const purchaseTrades = trades.filter(t => t.tradeType === 'purchase');
-            const pendingTrades = trades.filter(t => t.status === 'pending');
-            document.getElementById('totalConsignment').textContent = consignmentTrades.length;
-            document.getElementById('totalPurchase').textContent = purchaseTrades.length;
-            document.getElementById('pendingTrades').textContent = pendingTrades.length;
+            const consignmentTrades = trades.filter(trade => trade.tradeType === 'consignment');
+            const purchaseTrades = trades.filter(trade => trade.tradeType === 'purchase');
+            const pendingTrades = trades.filter(trade => trade.status === 'pending');
+
+            const totalConsignment = document.getElementById('totalConsignment');
+            const totalPurchase = document.getElementById('totalPurchase');
+            const pendingTradesEl = document.getElementById('pendingTrades');
+            
+            if (totalConsignment) totalConsignment.textContent = consignmentTrades.length;
+            if (totalPurchase) totalPurchase.textContent = purchaseTrades.length;
+            if (pendingTradesEl) pendingTradesEl.textContent = pendingTrades.length;
         }
 
         // 顯示交易記錄
         function displayTrades() {
             const logContainer = document.getElementById('tradeLog');
             if (!logContainer) return;
-
+            
             let filteredTrades = trades;
-            if (currentLogFilter !== 'all') {
-                filteredTrades = trades.filter(trade => 
-                    currentLogFilter === 'pending' ? trade.status === 'pending' : trade.tradeType === currentLogFilter
-                );
+            switch(currentLogFilter) {
+                case 'consignment':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'consignment');
+                    break;
+                case 'purchase':
+                    filteredTrades = trades.filter(trade => trade.tradeType === 'purchase');
+                    break;
+                case 'pending':
+                    filteredTrades = trades.filter(trade => trade.status === 'pending');
+                    break;
             }
-
+            
             if (filteredTrades.length === 0) {
-                const filterText = { all: '交易', consignment: '代售', purchase: '代收', pending: '待處理' }[currentLogFilter];
-                logContainer.innerHTML = `<div class="empty-log">還沒有任何${filterText}記錄</div>`;
+                const filterText = currentLogFilter === 'all' ? '交易記錄' : 
+                                currentLogFilter === 'consignment' ? '代售記錄' :
+                                currentLogFilter === 'purchase' ? '代收記錄' : '待處理記錄';
+                logContainer.innerHTML = `<div class="empty-log">還沒有任何${filterText}<br>開始新增委託吧！</div>`;
                 return;
             }
 
             const tradesHtml = filteredTrades.map((trade) => {
-                const typeTextMap = { equipment: '裝備', scroll: '捲軸', quest: '任務道具', mineral: '礦物', bag: '背包', potion: '藥水', cash: '商城道具' };
-                const typeText = typeTextMap[trade.itemType] || '未知';
+                let typeText;
+                switch(trade.itemType) {
+                    case 'equipment': typeText = '裝備'; break;
+                    case 'scroll': typeText = '捲軸'; break;
+                    case 'quest': typeText = '任務道具'; break;
+                    case 'mineral': typeText = '礦物'; break;
+                    case 'bag': typeText = '背包'; break;
+                    case 'potion': typeText = '藥水'; break;
+                    case 'cash': typeText = '商城道具'; break;
+                    default: typeText = trade.itemType || '未知';
+                }
+
                 const tradeTypeText = trade.tradeType === 'consignment' ? '代售' : '代收';
-                const tradeTypeClass = `trade-type-${trade.tradeType}`;
-                const itemClass = trade.tradeType;
-                const date = trade.timestamp ? new Date(trade.timestamp).toLocaleString('zh-TW') : '無效時間';
+                const tradeTypeClass = trade.tradeType === 'consignment' ? 'trade-type-consignment' : 'trade-type-purchase';
+                const itemClass = trade.tradeType === 'consignment' ? 'consignment' : 'purchase';
+                
+                let date;
+                try {
+                    date = new Date(trade.timestamp).toLocaleString('zh-TW');
+                } catch (e) {
+                    date = trade.timestamp || '無效時間';
+                }
+                
                 const statusText = trade.status === 'pending' ? '待處理' : '已完成';
-                // 這裡的 client 欄位是從後端接收的統一委託人欄位，確保它被正確顯示
-                const clientName = trade.client || '未知'; 
-                const quantityText = trade.quantity > 1 ? ` x${trade.quantity}` : '';
+                const clientName = trade.client || (trade.tradeType === 'consignment' ? trade.seller : trade.buyer) || '未知';
 
                 return `
                     <div class="trade-item ${itemClass}">
                         <div class="trade-item-header">
-                            <div class="trade-item-title">${trade.itemName || '未知道具'}${quantityText}</div>
+                            <div class="trade-item-title">${trade.itemName || '未知道具'} ${trade.quantity > 1 ? `x${trade.quantity}` : ''}</div>
                             <div class="trade-item-type ${tradeTypeClass}">${tradeTypeText} - ${typeText}</div>
                         </div>
                         <div class="trade-item-details">
                             <div><strong>委託人:</strong> ${clientName}</div>
+                            ${trade.quantity > 1 ? `<div><strong>數量:</strong> ${trade.quantity}</div>` : ''}
                             <div><strong>狀態:</strong> ${statusText}</div>
                             <div><strong>時間:</strong> ${date}</div>
                             ${trade.notes ? `<div><strong>備註:</strong> ${trade.notes}</div>` : ''}
@@ -955,166 +978,158 @@
                     </div>
                 `;
             }).join('');
+
             logContainer.innerHTML = tradesHtml;
         }
 
-        // 通用表單提交處理函數
-        async function handleFormSubmit(event, tradeType) {
-            event.preventDefault(); // 防止表單預設提交行為
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('楓之谷系統初始化...');
+            if (apiUrl) {
+                document.getElementById('apiUrl').value = apiUrl;
+                updateSyncStatus('offline');
+                setTimeout(() => {
+                    testConnection();
+                }, 1000);
+            } else {
+                updateSyncStatus('offline');
+                showMessage('請先設定 Google Apps Script API 網址', 'error');
+            }
 
-            const isConsignment = tradeType === 'consignment';
-            const form = event.target;
-            const submitBtn = form.querySelector('button[type="submit"]'); // 獲取當前提交表單內的按鈕
-            
-            const originalText = submitBtn.textContent;
+            // 代售表單提交
+            document.getElementById('consignmentForm')?.addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-            // 啟用提交按鈕的最後步驟，確保它總會被執行
-            const restoreSubmitButton = () => {
-                console.log('恢復提交按鈕狀態'); // 新增日誌
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
-                }
-            };
-
-            try {
-                submitBtn.disabled = true; // 禁用按鈕
-                submitBtn.textContent = '提交中...'; // 更新按鈕文字
-
-                // *** 修正：直接從 document 獲取元素，並明確檢查其存在性 ***
-                // 這樣可以避免 form.querySelector 在 display: none; 的 tab 內容中可能出現的問題
-                const itemNameId = `${tradeType}-itemName`;
-                const itemTypeId = `${tradeType}-itemType`;
-                const quantityId = `${tradeType}-quantity`;
-                const notesId = `${tradeType}-notes`;
-                const sellerId = `${tradeType}-seller`;
-                const buyerId = `${tradeType}-buyer`;
-
-                console.log(`嘗試獲取元素 ID: ${itemNameId}`); // 明確打印目標 ID
-                const itemNameEl = document.getElementById(itemNameId);
-                console.log(`結果:`, itemNameEl); // 打印獲取結果
-
-                console.log(`嘗試獲取元素 ID: ${itemTypeId}`);
-                const itemTypeEl = document.getElementById(itemTypeId);
-                console.log(`結果:`, itemTypeEl);
-
-                console.log(`嘗試獲取元素 ID: ${quantityId}`);
-                const quantityEl = document.getElementById(quantityId);
-                console.log(`結果:`, quantityEl);
-
-                console.log(`嘗試獲取元素 ID: ${notesId}`);
-                const notesEl = document.getElementById(notesId);
-                console.log(`結果:`, notesEl);
-
-                let sellerEl = null;
-                let buyerEl = null;
-
-                if (isConsignment) {
-                    console.log(`嘗試獲取元素 ID: ${sellerId}`);
-                    sellerEl = document.getElementById(sellerId);
-                    console.log(`結果:`, sellerEl);
-                } else {
-                    console.log(`嘗試獲取元素 ID: ${buyerId}`);
-                    buyerEl = document.getElementById(buyerId);
-                    console.log(`結果:`, buyerEl);
-                }
-
-
-                // 嚴格檢查所有必要元素是否存在
-                if (!itemNameEl) { console.error(`錯誤: 找不到 ${itemNameId} 元素`); showMessage(`錯誤: 找不到 ${itemNameId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!itemTypeEl) { console.error(`錯誤: 找不到 ${itemTypeId} 元素`); showMessage(`錯誤: 找不到 ${itemTypeId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!quantityEl) { console.error(`錯誤: 找不到 ${quantityId} 元素`); showMessage(`錯誤: 找不到 ${quantityId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!notesEl) { console.error(`錯誤: 找不到 ${notesId} 元素`); showMessage(`錯誤: 找不到 ${notesId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (isConsignment && !sellerEl) { console.error(`錯誤: 找不到 ${sellerId} 元素`); showMessage(`錯誤: 找不到 ${sellerId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-                if (!isConsignment && !buyerEl) { console.error(`錯誤: 找不到 ${buyerId} 元素`); showMessage(`錯誤: 找不到 ${buyerId} 元素`, 'error'); restoreSubmitButton(); return; } // Add restore
-
+                const submitBtn = document.getElementById('consignSubmitBtn');
+                if (!submitBtn) return;
+                
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = '提交中...';
 
                 const trade = {
-                    tradeType: tradeType,
-                    itemName: itemNameEl.value.trim(), // 新增 .trim() 確保沒有多餘空白
-                    itemType: itemTypeEl.value.trim(),   // 新增 .trim()
-                    seller: isConsignment && sellerEl ? sellerEl.value.trim() : '', // 新增 .trim()
-                    buyer: !isConsignment && buyerEl ? buyerEl.value.trim() : '',     // 新增 .trim()
-                    quantity: parseInt(quantityEl.value) || 1,
-                    notes: notesEl.value.trim() || '',   // 新增 .trim()
-                    timestamp: new Date().toISOString(),
-                    status: 'pending' // 預設為待處理
+                    tradeType: 'consignment',
+                    itemName: document.getElementById('consign-itemName')?.value || '',
+                    itemType: document.getElementById('consign-itemType')?.value || '',
+                    seller: document.getElementById('consign-seller')?.value || '',
+                    buyer: '',
+                    quantity: parseInt(document.getElementById('consign-quantity')?.value) || 1,
+                    notes: document.getElementById('consign-notes')?.value || '',
+                    timestamp: new Date().toISOString()
                 };
 
-                console.log(`準備提交的 ${isConsignment ? '代售' : '代收'}委託資料:`, trade); // 顯示完整的 trade 物件
+                console.log('提交代售委託:', trade);
 
-                // 檢查下拉選單的選中值是否為空字串，而不是僅檢查元素是否存在
-                // 預設的 <option value="">請選擇</option> 會導致 !trade.itemType 或 !trade.seller/buyer 為 true
-                if (!trade.itemName) { // 已經 trim() 過，所以不需要 .trim()
-                    console.warn('驗證失敗: 道具名稱為空'); // 新增日誌
-                    showMessage('請輸入道具名稱', 'error');
-                    restoreSubmitButton(); // Add restore
-                    return;
-                }
-                if (!trade.itemType) { // 已經 trim() 過
-                    console.warn('驗證失敗: 道具類型為空'); // 新增日誌
-                    showMessage('請選擇道具類型', 'error');
-                    restoreSubmitButton(); // Add restore
-                    return;
-                }
-                if (isConsignment && !trade.seller) { // 已經 trim() 過
-                    console.warn('驗證失敗: 代售委託人(賣家)為空'); // 新增日誌
-                    showMessage('代售委託請選擇委託人（賣家）', 'error');
-                    restoreSubmitButton(); // Add restore
-                    return;
-                }
-                if (!isConsignment && !trade.buyer) { // 已經 trim() 過
-                    console.warn('驗證失敗: 代收委託人(買家)為空'); // 新增日誌
-                    showMessage('代收委託請選擇委託人（買家）', 'error');
-                    restoreSubmitButton(); // Add restore
+                if (!trade.itemName || !trade.itemType || !trade.seller) {
+                    showMessage('請填寫所有必要欄位', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
                     return;
                 }
 
-                console.log('所有驗證通過，嘗試儲存交易...'); // 新增日誌
-                const success = await saveTrade(trade); // 呼叫 API 儲存資料
+                const success = await saveTrade(trade);
+                
                 if (success) {
-                    form.reset(); // 清空表單
-                    await loadTrades(); // 重新載入交易記錄
-                    showMessage(`${isConsignment ? '代售' : '代收'}委託已成功提交！`, 'success');
-                } else {
-                    // saveTrade 失敗時，showMessage 會在 saveTrade 內部呼叫
-                    // 這裡不需要額外的 showMessage
-                    console.error('saveTrade 函式返回失敗'); // 新增日誌
+                    this.reset();
+                    await loadTrades();
+                    showMessage('代售委託已成功提交！', 'success');
                 }
 
-            } catch (error) {
-                console.error('處理表單提交時發生錯誤:', error);
-                // 顯示內部錯誤訊息，幫助診斷
-                showMessage(`提交失敗: ${error.message}`, 'error');
-            } finally {
-                // 無論成功或失敗，最後都要恢復按鈕狀態
-                // This is a safety net. Individual 'return' paths should also call restore.
-                // restoreSubmitButton(); // Removed from here, moved to individual return paths
-            }
-        }
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
 
-        // 綁定表單事件
-        // 這些綁定仍然需要在 DOMContentLoaded 之後
-        // document.getElementById('consignmentForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'consignment'));
-        // document.getElementById('purchaseForm')?.addEventListener('submit', (e) => handleFormSubmit(e, 'purchase'));
+            // 代收表單提交
+            document.getElementById('purchaseForm')?.addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-        // 其他事件監聽器
+                const submitBtn = document.getElementById('purchaseSubmitBtn');
+                if (!submitBtn) return;
+                
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = '提交中...';
+
+                const trade = {
+                    tradeType: 'purchase',
+                    itemName: document.getElementById('purchase-itemName')?.value || '',
+                    itemType: document.getElementById('purchase-itemType')?.value || '',
+                    seller: '',
+                    buyer: document.getElementById('purchase-buyer')?.value || '',
+                    quantity: parseInt(document.getElementById('purchase-quantity')?.value) || 1,
+                    notes: document.getElementById('purchase-notes')?.value || '',
+                    timestamp: new Date().toISOString()
+                };
+
+                console.log('提交代收委託:', trade);
+
+                if (!trade.itemName || !trade.itemType || !trade.buyer) {
+                    showMessage('請填寫所有必要欄位', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                    return;
+                }
+
+                const success = await saveTrade(trade);
+                
+                if (success) {
+                    this.reset();
+                    await loadTrades();
+                    showMessage('代收委託已成功提交！', 'success');
+                }
+
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+
+            // 自動儲存 API 設定
+            document.getElementById('apiUrl')?.addEventListener('input', function() {
+                clearTimeout(this.saveTimeout);
+                this.saveTimeout = setTimeout(() => {
+                    if (this.value.trim() && this.value.includes('script.google.com')) {
+                        localStorage.setItem('consignmentApiUrl', this.value.trim());
+                        apiUrl = this.value.trim();
+                    }
+                }, 1000);
+            });
+        });
+
+        // 鍵盤快捷鍵支援
         document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && (e.key === 'r' || e.key === 'R')) {
+            if (e.ctrlKey && e.key === 'r') {
                 e.preventDefault();
                 loadTrades();
             }
+            
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                testConnection();
+            }
         });
 
-        window.addEventListener('online', () => { if (apiUrl) testConnection(); });
-        window.addEventListener('offline', () => updateSyncStatus('error'));
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && apiUrl) setTimeout(() => testConnection(), 1000);
+        // 錯誤恢復機制
+        window.addEventListener('online', function() {
+            console.log('網路已恢復');
+            if (apiUrl) {
+                setTimeout(() => testConnection(), 1000);
+            }
         });
 
-        console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v6.1 穩定修正版');
+        window.addEventListener('offline', function() {
+            console.log('網路已斷線');
+            updateSyncStatus('error');
+            showMessage('網路連線已斷開，請檢查網路設定', 'error');
+        });
 
-    })(); // IIFE 結束
-</script>
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && apiUrl) {
+                setTimeout(() => {
+                    testConnection();
+                }, 2000);
+            }
+        });
+
+        console.log('楓之谷 Artale 楓葉萬事屋系統已載入 - v6.3 完全修正版');
+    </script>
 </body>
 </html>
